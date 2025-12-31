@@ -1,7 +1,7 @@
-import { Router } from 'express';
-import { Prisma } from '@prisma/client';
-import prisma from '../lib/prisma';
-import { optionalAuth, requireAuth } from '../middleware/auth';
+import { Router } from "express";
+import { Prisma } from "@prisma/client";
+import prisma from "../lib/prisma";
+import { optionalAuth, requireAuth } from "../middleware/auth";
 
 const router = Router();
 
@@ -12,43 +12,44 @@ function formatPlan(plan: any) {
     description: plan.description,
     price: Number(plan.price),
     currency: plan.currency,
-    durationDays: plan.durationDays,
-    scope: plan.scope,
-    countryCodes: plan.countryCodes ?? null,
-    maxDreams: plan.maxDreams,
-    maxInterpretations: plan.maxInterpretations,
     letterQuota: plan.letterQuota,
-    audioMinutesQuota: plan.audioMinutesQuota,
-    features: plan.features ?? [],
+    features: Array.isArray(plan.features)
+      ? plan.features
+      : plan.features
+      ? JSON.parse(plan.features)
+      : [],
     isActive: plan.isActive,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
 }
 
-router.get('/', optionalAuth, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
-    const includeInactive = req.query.includeInactive === 'true';
+    const includeInactive = req.query.includeInactive === "true";
     const requesterRole = req.user?.role;
 
-    const isElevated = requesterRole === 'admin' || requesterRole === 'super_admin';
+    const isElevated =
+      requesterRole === "admin" || requesterRole === "super_admin";
 
     const plans = await prisma.plan.findMany({
       where: includeInactive && isElevated ? {} : { isActive: true },
-      orderBy: { price: 'asc' },
+      orderBy: { price: "asc" },
     });
 
     return res.json({ plans: plans.map(formatPlan) });
   } catch (error) {
-    console.error('[Plans] Fetch error:', error);
-    return res.status(500).json({ error: 'Failed to fetch plans' });
+    console.error("[Plans] Fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch plans" });
   }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
-    if (req.user!.role !== 'super_admin') {
-      return res.status(403).json({ error: 'Forbidden - Super admin access required' });
+    if (req.user!.role !== "super_admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden - Super admin access required" });
     }
 
     const {
@@ -56,7 +57,7 @@ router.post('/', requireAuth, async (req, res) => {
       description,
       price,
       currency,
-      scope = 'international',
+      scope = "international",
       durationDays,
       maxDreams,
       maxInterpretations,
@@ -67,20 +68,20 @@ router.post('/', requireAuth, async (req, res) => {
       isActive = true,
     } = req.body ?? {};
 
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ error: 'Plan name is required' });
+    if (!name || typeof name !== "string") {
+      return res.status(400).json({ error: "Plan name is required" });
     }
 
     if (price === undefined || price === null || Number.isNaN(Number(price))) {
-      return res.status(400).json({ error: 'Valid plan price is required' });
+      return res.status(400).json({ error: "Valid plan price is required" });
     }
 
-    if (!currency || typeof currency !== 'string') {
-      return res.status(400).json({ error: 'Plan currency is required' });
+    if (!currency || typeof currency !== "string") {
+      return res.status(400).json({ error: "Plan currency is required" });
     }
 
     if (!durationDays || Number.isNaN(Number(durationDays))) {
-      return res.status(400).json({ error: 'Plan durationDays is required' });
+      return res.status(400).json({ error: "Plan durationDays is required" });
     }
 
     const plan = await prisma.plan.create({
@@ -92,9 +93,11 @@ router.post('/', requireAuth, async (req, res) => {
         scope,
         durationDays: Number(durationDays),
         maxDreams: maxDreams !== undefined ? Number(maxDreams) : null,
-        maxInterpretations: maxInterpretations !== undefined ? Number(maxInterpretations) : null,
+        maxInterpretations:
+          maxInterpretations !== undefined ? Number(maxInterpretations) : null,
         letterQuota: letterQuota !== undefined ? Number(letterQuota) : null,
-        audioMinutesQuota: audioMinutesQuota !== undefined ? Number(audioMinutesQuota) : null,
+        audioMinutesQuota:
+          audioMinutesQuota !== undefined ? Number(audioMinutesQuota) : null,
         countryCodes: countryCodes ?? null,
         features: features ?? [],
         isActive: Boolean(isActive),
@@ -103,15 +106,17 @@ router.post('/', requireAuth, async (req, res) => {
 
     return res.status(201).json({ plan: formatPlan(plan) });
   } catch (error) {
-    console.error('[Plans] Create error:', error);
-    return res.status(500).json({ error: 'Failed to create plan' });
+    console.error("[Plans] Create error:", error);
+    return res.status(500).json({ error: "Failed to create plan" });
   }
 });
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch("/:id", requireAuth, async (req, res) => {
   try {
-    if (req.user!.role !== 'super_admin') {
-      return res.status(403).json({ error: 'Forbidden - Super admin access required' });
+    if (req.user!.role !== "super_admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden - Super admin access required" });
     }
 
     const { id } = req.params;
@@ -119,7 +124,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const existingPlan = await prisma.plan.findUnique({ where: { id } });
 
     if (!existingPlan) {
-      return res.status(404).json({ error: 'Plan not found' });
+      return res.status(404).json({ error: "Plan not found" });
     }
 
     const {
@@ -150,15 +155,19 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (durationDays !== undefined && !Number.isNaN(Number(durationDays))) {
       updateData.durationDays = Number(durationDays);
     }
-    if (maxDreams !== undefined) updateData.maxDreams = maxDreams !== null ? Number(maxDreams) : null;
+    if (maxDreams !== undefined)
+      updateData.maxDreams = maxDreams !== null ? Number(maxDreams) : null;
     if (maxInterpretations !== undefined) {
-      updateData.maxInterpretations = maxInterpretations !== null ? Number(maxInterpretations) : null;
+      updateData.maxInterpretations =
+        maxInterpretations !== null ? Number(maxInterpretations) : null;
     }
     if (letterQuota !== undefined) {
-      updateData.letterQuota = letterQuota !== null ? Number(letterQuota) : null;
+      updateData.letterQuota =
+        letterQuota !== null ? Number(letterQuota) : null;
     }
     if (audioMinutesQuota !== undefined) {
-      updateData.audioMinutesQuota = audioMinutesQuota !== null ? Number(audioMinutesQuota) : null;
+      updateData.audioMinutesQuota =
+        audioMinutesQuota !== null ? Number(audioMinutesQuota) : null;
     }
     if (countryCodes !== undefined) updateData.countryCodes = countryCodes;
     if (features !== undefined) updateData.features = features;
@@ -171,24 +180,24 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
     return res.json({ plan: formatPlan(plan) });
   } catch (error) {
-    console.error('[Plans] Update error:', error);
-    return res.status(500).json({ error: 'Failed to update plan' });
+    console.error("[Plans] Update error:", error);
+    return res.status(500).json({ error: "Failed to update plan" });
   }
 });
 
-router.post('/subscribe', requireAuth, async (req, res) => {
+router.post("/subscribe", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
     const { planId } = req.body ?? {};
 
     if (!planId) {
-      return res.status(400).json({ error: 'planId is required' });
+      return res.status(400).json({ error: "planId is required" });
     }
 
     const plan = await prisma.plan.findUnique({ where: { id: planId } });
 
     if (!plan) {
-      return res.status(404).json({ error: 'Plan not found' });
+      return res.status(404).json({ error: "Plan not found" });
     }
 
     const expiresAt = new Date();
@@ -232,8 +241,8 @@ router.post('/subscribe', requireAuth, async (req, res) => {
           planId,
           amount: plan.price,
           currency: plan.currency,
-          status: 'succeeded',
-          provider: 'manual',
+          status: "succeeded",
+          provider: "manual",
           reference: `SUB-${Date.now()}`,
         },
       });
@@ -241,14 +250,13 @@ router.post('/subscribe', requireAuth, async (req, res) => {
       return upserted;
     });
 
-    return res.json({ subscription: { ...subscription, plan: formatPlan(subscription.plan) } });
+    return res.json({
+      subscription: { ...subscription, plan: formatPlan(subscription.plan) },
+    });
   } catch (error) {
-    console.error('[Plans] Subscribe error:', error);
-    return res.status(500).json({ error: 'Failed to subscribe to plan' });
+    console.error("[Plans] Subscribe error:", error);
+    return res.status(500).json({ error: "Failed to subscribe to plan" });
   }
 });
 
 export default router;
-
-
-

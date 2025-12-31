@@ -52,29 +52,35 @@ model Dream {
   id             String      @id @default(uuid())
   dreamerId      String      @map("dreamer_id")
   interpreterId  String?     @map("interpreter_id")
+  planId         String?     @map("plan_id") // Plan purchased for this dream
   title          String
   content        String
   status         DreamStatus @default(new)
   interpretation String?
-  description    String?     @db.Text // Changed from 'notes' and type updated
+  description    String?     @db.Text
   dreamDate      DateTime?   @map("dream_date")
   mood           String?
   metadata       Json?
   audioUrl       String?     @map("audio_url") @db.VarChar(500)
   audioDuration  Int?        @map("audio_duration") // in seconds
+  isSatisfied    Boolean     @default(false) @map("is_satisfied") // Dreamer satisfied with interpretation
+  satisfiedAt    DateTime?   @map("satisfied_at")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  dreamer     Profile   @relation("DreamerDreams", fields: [dreamerId], references: [id], onDelete: Cascade)
-  interpreter Profile?  @relation("InterpreterDreams", fields: [interpreterId], references: [id], onDelete: SetNull)
-  messages    Message[]
-  comments    Comment[]
-  requests    Request[]
+  dreamer      Profile            @relation("DreamerDreams", fields: [dreamerId], references: [id], onDelete: Cascade)
+  interpreter  Profile?           @relation("InterpreterDreams", fields: [interpreterId], references: [id], onDelete: SetNull)
+  plan         Plan?              @relation(fields: [planId], references: [id], onDelete: SetNull)
+  messages     Message[]
+  comments     Comment[]
+  requests     Request[]
+  planPurchase DreamPlanPurchase?
 
   @@index([dreamerId])
   @@index([interpreterId])
   @@index([status])
+  @@index([planId])
   @@map("dreams")
 }
 
@@ -135,27 +141,21 @@ model ChatMessage {
 }
 
 model Plan {
-  id                 String     @id @default(uuid())
-  name               String     @unique
-  description        String?
-  price              Decimal    @db.Decimal(10, 2)
-  currency           String     @map("currency") @db.VarChar(3)
-  scope              PlanScope  @default(international)
-  countryCodes       Json?      @map("country_codes")
-  durationDays       Int        @map("duration_days")
-  maxDreams          Int?       @map("max_dreams")
-  maxInterpretations Int?       @map("max_interpretations")
-  letterQuota        Int?       @map("letter_quota")
-  audioMinutesQuota  Int?       @map("audio_minutes_quota")
-  features           Json
-  isActive           Boolean    @default(true) @map("is_active")
-  createdAt          DateTime   @default(now()) @map("created_at")
-  updatedAt          DateTime   @updatedAt @map("updated_at")
-  isTrial            Boolean    @default(false) @map("is_trial")
-  trialDurationDays  Int?       @map("trial_duration_days")
-  payments           Payment[]
-  profilesUsingPlan  Profile[]  @relation("CurrentPlan")
-  userPlans          UserPlan[]
+  id                String              @id @default(uuid())
+  name              String              @unique
+  description       String?
+  price             Decimal             @db.Decimal(10, 2)
+  currency          String              @map("currency") @db.VarChar(3)
+  letterQuota       Int                 @map("letter_quota") // Letters allowed for ONE dream
+  features          Json                @default("[]")
+  isActive          Boolean             @default(true) @map("is_active")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  payments          Payment[]
+  dreamPurchases    DreamPlanPurchase[]
+  dreams            Dream[]
+  profilesUsingPlan Profile[]           @relation("CurrentPlan")
+  userPlans         UserPlan[]
 
   @@map("plans")
 }
@@ -179,24 +179,46 @@ model UserPlan {
 }
 
 model Payment {
-  id        String        @id @default(uuid())
-  userId    String        @map("user_id")
-  planId    String?       @map("plan_id")
-  amount    Decimal       @db.Decimal(10, 2)
-  currency  String        @db.VarChar(3)
-  status    PaymentStatus @default(pending)
-  provider  String?       @map("provider") @db.VarChar(100)
-  reference String?       @map("reference")
-  metadata  Json?
-  paidAt    DateTime?     @map("paid_at")
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
-  plan      Plan?         @relation(fields: [planId], references: [id])
-  user      Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String             @id @default(uuid())
+  userId        String             @map("user_id")
+  planId        String             @map("plan_id") // Required - payment is for a plan
+  dreamId       String?            @map("dream_id") // Optional - links payment to specific dream
+  amount        Decimal            @db.Decimal(10, 2)
+  currency      String             @db.VarChar(3)
+  status        PaymentStatus      @default(pending)
+  provider      String?            @map("provider") @db.VarChar(100)
+  reference     String?            @map("reference")
+  metadata      Json?
+  paidAt        DateTime?          @map("paid_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  plan          Plan               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user          Profile            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dreamPurchase DreamPlanPurchase?
 
   @@index([planId], map: "payments_plan_id_fkey")
   @@index([userId], map: "payments_user_id_fkey")
+  @@index([dreamId])
   @@map("payments")
+}
+
+// Links a purchased plan to a specific dream
+model DreamPlanPurchase {
+  id          String   @id @default(uuid())
+  dreamId     String   @unique @map("dream_id")
+  planId      String   @map("plan_id")
+  paymentId   String   @unique @map("payment_id")
+  letterQuota Int      @map("letter_quota") // Letters allowed for this dream
+  lettersUsed Int      @default(0) @map("letters_used")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  dream   Dream   @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([paymentId])
+  @@map("dream_plan_purchases")
 }
 
 model Request {
@@ -258,6 +280,7 @@ enum Role {
 
 enum DreamStatus {
   new
+  pending_payment
   pending_inquiry
   pending_interpretation
   interpreted

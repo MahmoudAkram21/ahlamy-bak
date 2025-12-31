@@ -51,16 +51,27 @@ router.get('/', requireAuth, async (req, res) => {
         sender: {
           select: {
             id: true,
-            fullName: true,
-            role: true,
-            avatarUrl: true,
+            role: true, // Only role for anonymous display
+            // Exclude: fullName, avatarUrl, email - all contact info hidden
           },
         },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    return res.json(messages);
+    // Return anonymous messages - replace sender info with generic labels
+    const anonymousMessages = messages.map((msg) => ({
+      ...msg,
+      sender: {
+        id: msg.sender.id,
+        role: msg.sender.role,
+        // Use generic labels instead of real names
+        displayName: msg.sender.role === 'dreamer' ? 'الرائي' : 'المفسر',
+        // No avatarUrl, fullName, or email exposed
+      },
+    }));
+
+    return res.json(anonymousMessages);
   } catch (error) {
     console.error('[Messages] Fetch error:', error);
     return res.status(500).json({ error: 'Failed to fetch messages' });
@@ -139,14 +150,26 @@ router.post('/', requireAuth, async (req, res) => {
         sender: {
           select: {
             id: true,
-            fullName: true,
-            avatarUrl: true,
+            role: true, // Only role for anonymous display
+            // Exclude: fullName, avatarUrl, email - all contact info hidden
           },
         },
       },
     });
 
-    return res.status(201).json(message);
+    // Return anonymous message
+    const anonymousMessage = {
+      ...message,
+      sender: {
+        id: message.sender.id,
+        role: message.sender.role,
+        // Use generic labels instead of real names
+        displayName: message.sender.role === 'dreamer' ? 'الرائي' : 'المفسر',
+        // No avatarUrl, fullName, or email exposed
+      },
+    };
+
+    return res.status(201).json(anonymousMessage);
   } catch (error) {
     console.error('[Messages] Create error:', error);
     return res.status(500).json({ error: 'Failed to send message' });
