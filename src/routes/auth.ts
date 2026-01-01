@@ -46,36 +46,8 @@ router.post('/register', async (req, res) => {
         },
       });
 
-      // Auto-assign free trial plan for dreamers
-      if (role === 'dreamer') {
-        const trialPlan = await tx.plan.findFirst({
-          where: {
-            isTrial: true,
-            isActive: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-
-        if (trialPlan && trialPlan.trialDurationDays) {
-          const now = new Date();
-          const expiresAt = new Date(now);
-          expiresAt.setDate(expiresAt.getDate() + trialPlan.trialDurationDays);
-
-          await tx.userPlan.create({
-            data: {
-              userId: createdUser.id,
-              planId: trialPlan.id,
-              isActive: true,
-              startedAt: now,
-              expiresAt: expiresAt,
-              lettersUsed: 0,
-              audioMinutesUsed: 0,
-            },
-          });
-
-          console.log(`[Auth] Assigned trial plan to new dreamer: ${email}, expires: ${expiresAt.toISOString()}`);
-        }
-      }
+      // Note: Trial plans are no longer supported in the new per-dream model
+      // Users will purchase plans per dream instead
 
       return { user: createdUser, profile: createdProfile };
     });
@@ -218,11 +190,8 @@ router.get('/me', requireAuth, async (req, res) => {
           id: profile.currentPlan.id,
           name: profile.currentPlan.name,
           price: profile.currentPlan.price.toString(),
-          durationDays: profile.currentPlan.durationDays,
           currency: profile.currentPlan.currency,
           letterQuota: profile.currentPlan.letterQuota,
-          audioMinutesQuota: profile.currentPlan.audioMinutesQuota,
-          scope: profile.currentPlan.scope,
         } : null,
         subscription: activeSubscription
           ? {
@@ -232,7 +201,6 @@ router.get('/me', requireAuth, async (req, res) => {
             expiresAt: activeSubscription.expiresAt?.toISOString() ?? null,
             lettersUsed: activeSubscription.lettersUsed,
             audioMinutesUsed: activeSubscription.audioMinutesUsed,
-            isTrial: activeSubscription.plan?.isTrial ?? false,
             plan: activeSubscription.plan
               ? {
                 id: activeSubscription.plan.id,
@@ -240,11 +208,6 @@ router.get('/me', requireAuth, async (req, res) => {
                 price: activeSubscription.plan.price.toString(),
                 currency: activeSubscription.plan.currency,
                 letterQuota: activeSubscription.plan.letterQuota,
-                audioMinutesQuota: activeSubscription.plan.audioMinutesQuota,
-                durationDays: activeSubscription.plan.durationDays,
-                scope: activeSubscription.plan.scope,
-                isTrial: activeSubscription.plan.isTrial,
-                trialDurationDays: activeSubscription.plan.trialDurationDays,
               }
               : null,
           }

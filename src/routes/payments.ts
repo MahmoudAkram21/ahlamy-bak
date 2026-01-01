@@ -179,7 +179,7 @@ router.post("/create-checkout-session", requireAuth, async (req, res) => {
       metadata: {
         userId: userId,
         planId: plan.id,
-        durationDays: plan.durationDays.toString(),
+        purchaseType: "subscription", // Legacy subscription purchase
       },
     });
 

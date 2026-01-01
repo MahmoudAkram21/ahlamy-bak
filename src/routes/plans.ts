@@ -57,13 +57,7 @@ router.post("/", requireAuth, async (req, res) => {
       description,
       price,
       currency,
-      scope = "international",
-      durationDays,
-      maxDreams,
-      maxInterpretations,
       letterQuota,
-      audioMinutesQuota,
-      countryCodes,
       features,
       isActive = true,
     } = req.body ?? {};
@@ -80,8 +74,8 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Plan currency is required" });
     }
 
-    if (!durationDays || Number.isNaN(Number(durationDays))) {
-      return res.status(400).json({ error: "Plan durationDays is required" });
+    if (letterQuota === undefined || letterQuota === null || Number.isNaN(Number(letterQuota))) {
+      return res.status(400).json({ error: "Plan letterQuota is required" });
     }
 
     const plan = await prisma.plan.create({
@@ -90,15 +84,7 @@ router.post("/", requireAuth, async (req, res) => {
         description,
         price: new Prisma.Decimal(price),
         currency: currency.toUpperCase(),
-        scope,
-        durationDays: Number(durationDays),
-        maxDreams: maxDreams !== undefined ? Number(maxDreams) : null,
-        maxInterpretations:
-          maxInterpretations !== undefined ? Number(maxInterpretations) : null,
-        letterQuota: letterQuota !== undefined ? Number(letterQuota) : null,
-        audioMinutesQuota:
-          audioMinutesQuota !== undefined ? Number(audioMinutesQuota) : null,
-        countryCodes: countryCodes ?? null,
+        letterQuota: Number(letterQuota),
         features: features ?? [],
         isActive: Boolean(isActive),
       },
@@ -132,13 +118,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
       description,
       price,
       currency,
-      scope,
-      durationDays,
-      maxDreams,
-      maxInterpretations,
       letterQuota,
-      audioMinutesQuota,
-      countryCodes,
       features,
       isActive,
     } = req.body ?? {};
@@ -151,25 +131,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
       updateData.price = new Prisma.Decimal(price);
     }
     if (currency !== undefined) updateData.currency = currency.toUpperCase();
-    if (scope !== undefined) updateData.scope = scope;
-    if (durationDays !== undefined && !Number.isNaN(Number(durationDays))) {
-      updateData.durationDays = Number(durationDays);
+    if (letterQuota !== undefined && !Number.isNaN(Number(letterQuota))) {
+      updateData.letterQuota = Number(letterQuota);
     }
-    if (maxDreams !== undefined)
-      updateData.maxDreams = maxDreams !== null ? Number(maxDreams) : null;
-    if (maxInterpretations !== undefined) {
-      updateData.maxInterpretations =
-        maxInterpretations !== null ? Number(maxInterpretations) : null;
-    }
-    if (letterQuota !== undefined) {
-      updateData.letterQuota =
-        letterQuota !== null ? Number(letterQuota) : null;
-    }
-    if (audioMinutesQuota !== undefined) {
-      updateData.audioMinutesQuota =
-        audioMinutesQuota !== null ? Number(audioMinutesQuota) : null;
-    }
-    if (countryCodes !== undefined) updateData.countryCodes = countryCodes;
     if (features !== undefined) updateData.features = features;
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
@@ -200,8 +164,11 @@ router.post("/subscribe", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Plan not found" });
     }
 
+    // Note: Legacy subscription endpoint - plans are now purchased per-dream
+    // This endpoint is kept for backward compatibility but may not work as expected
+    // since plans no longer have durationDays
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1); // Default to 1 year
 
     const subscription = await prisma.$transaction(async (tx) => {
       const upserted = await tx.userPlan.upsert({
