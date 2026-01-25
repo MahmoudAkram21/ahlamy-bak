@@ -144,7 +144,6 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    console.log(req)
     const profile = await prisma.profile.findUnique({
       where: { id: userId },
       include: {
