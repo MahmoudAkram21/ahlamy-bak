@@ -415,4 +415,142 @@ router.get("/history", requireAuth, async (req, res) => {
   }
 });
 
+// Verify payment session and update dream status (fallback for webhook)
+router.post("/verify-payment", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { sessionId, dreamId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required" });
+    }
+
+    if (!stripe) {
+      return res.status(503).json({
+        error: "Payment system not configured",
+      });
+    }
+
+    // Retrieve session from Stripe
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Verify session belongs to user
+    if (session.metadata?.userId !== userId) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    // Check if payment was successful
+    if (session.payment_status !== "paid") {
+      return res.status(400).json({
+        error: "Payment not completed",
+        status: session.payment_status,
+      });
+    }
+
+    const { planId, dreamId: sessionDreamId, letterQuota, purchaseType } = session.metadata || {};
+    const targetDreamId = dreamId || sessionDreamId;
+
+    // Handle per-dream purchase verification
+    if (purchaseType === "dream" && targetDreamId) {
+      // Check if already processed
+      const existingPurchase = await prisma.dreamPlanPurchase.findUnique({
+        where: { dreamId: targetDreamId },
+      });
+
+      if (existingPurchase) {
+        // Already processed, just return current dream status
+        const dream = await prisma.dream.findUnique({
+          where: { id: targetDreamId },
+          select: { id: true, status: true },
+        });
+
+        return res.json({
+          message: "Payment already verified",
+          dream,
+          alreadyProcessed: true,
+        });
+      }
+
+      // Process payment and update dream
+      const result = await prisma.$transaction(async (tx) => {
+        // Create payment record
+        const payment = await tx.payment.create({
+          data: {
+            userId: userId,
+            planId: planId!,
+            dreamId: targetDreamId,
+            amount: new Prisma.Decimal(session.amount_total ? session.amount_total / 100 : 0),
+            currency: session.currency?.toUpperCase() || "EGP",
+            status: "succeeded",
+            provider: "stripe",
+            reference: session.id,
+            paidAt: new Date(),
+            metadata: {
+              sessionId: session.id,
+              customerEmail: session.customer_email,
+              purchaseType: "dream",
+              verifiedManually: true,
+            },
+          },
+        });
+
+        // Create DreamPlanPurchase record
+        await tx.dreamPlanPurchase.create({
+          data: {
+            dreamId: targetDreamId,
+            planId: planId!,
+            paymentId: payment.id,
+            letterQuota: parseInt(letterQuota || "0", 10),
+            lettersUsed: 0,
+          },
+        });
+
+        // Update dream status from pending_payment to new
+        const  updatedDream = await tx.dream.update({
+          where: { id: targetDreamId },
+          data: {
+            status: "new",
+            planId: planId,
+          },
+          select: {
+            id: true,
+            status: true,
+            title: true,
+          },
+        });
+
+        return { payment, dream: updatedDream };
+      });
+
+      console.log(
+        "[Payments] Payment verified and dream updated for:",
+        targetDreamId
+      );
+
+      return res.json({
+        message: "Payment verified successfully",
+        dream: result.dream,
+        payment: {
+          id: result.payment.id,
+          amount: Number(result.payment.amount),
+          currency: result.payment.currency,
+        },
+      });
+    }
+
+    // Handle subscription verification (legacy)
+    return res.json({
+      message: "Payment verification completed",
+      sessionStatus: session.payment_status,
+    });
+  } catch (error) {
+    console.error("[Payments] Verify payment error:", error);
+    return res.status(500).json({ error: "Failed to verify payment" });
+  }
+});
+
 export default router;

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
 import { Prisma } from '@prisma/client';
+import { hashPassword } from '../utils/auth';
 
 const router = Router();
 
@@ -125,6 +126,89 @@ router.post('/make-super-admin', requireAuth, async (req, res) => {
   }
 });
 
+router.post('/users', requireAuth, async (req, res) => {
+  try {
+    const requesterId = req.user!.userId;
+    const { email, password, fullName, role = 'dreamer', isAvailable = true } = req.body ?? {};
+
+    const isSuperAdmin = await ensureRole(requesterId, ['super_admin']);
+
+    if (!isSuperAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Super admin access required' });
+    }
+
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const allowedRoles = ['dreamer', 'interpreter', 'admin', 'super_admin'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role value' });
+    }
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ error: 'User with this email already exists' });
+    }
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Create user and profile in transaction
+    const { user, profile } = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+        },
+      });
+
+      const createdProfile = await tx.profile.create({
+        data: {
+          id: createdUser.id,
+          email: createdUser.email,
+          fullName: fullName || null,
+          role,
+          isAvailable: typeof isAvailable === 'boolean' ? isAvailable : true,
+        },
+      });
+
+      return { user: createdUser, profile: createdProfile };
+    });
+
+    console.log(`[Admin] Created user: ${email} with role: ${role}`);
+
+    return res.status(201).json({
+      user: {
+        id: profile.id,
+        email: profile.email,
+        fullName: profile.fullName,
+        role: profile.role,
+        isAvailable: profile.isAvailable,
+        totalInterpretations: profile.totalInterpretations,
+        rating: profile.rating.toString(),
+        isAdmin: profile.role === 'admin' || profile.role === 'super_admin',
+        isSuperAdmin: profile.role === 'super_admin',
+        createdAt: profile.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin] Create user error:', error);
+    return res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
 router.patch('/users/:id', requireAuth, async (req, res) => {
   try {
     const requesterId = req.user!.userId;
@@ -216,6 +300,52 @@ router.patch('/users/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Admin] Update user error:', error);
     return res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+router.delete('/users/:id', requireAuth, async (req, res) => {
+  try {
+    const requesterId = req.user!.userId;
+    const targetId = req.params.id;
+
+    const isSuperAdmin = await ensureRole(requesterId, ['super_admin']);
+
+    if (!isSuperAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Super admin access required' });
+    }
+
+    // Prevent self-deletion
+    if (requesterId === targetId) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { id: targetId },
+      include: { profile: true },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete user (cascade will delete profile and related records)
+    await prisma.user.delete({
+      where: { id: targetId },
+    });
+
+    console.log(`[Admin] Deleted user: ${existingUser.email}`);
+
+    return res.json({
+      message: 'User deleted successfully',
+      deletedUser: {
+        id: targetId,
+        email: existingUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin] Delete user error:', error);
+    return res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
