@@ -4,7 +4,7 @@ import { verifyToken } from '../utils/auth';
 const SESSION_COOKIE_NAME = 'auth_token';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  console.log(req)
+  console.log(req.headers)
 
   const authHeader = req.headers.authorization;
   const cookieToken = req.cookies?.[SESSION_COOKIE_NAME];
