@@ -99,10 +99,10 @@ npx prisma db push
 
 ```bash
 # Health check
-curl http://localhost:5000/api/health
+curl https://b-ahlamy.developteam.site/api/health
 
 # Test authentication
-curl -X POST http://localhost:5000/api/auth/login \
+curl -X POST https://b-ahlamy.developteam.site/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@mubasharat.com","password":"admin123"}'
 ```
