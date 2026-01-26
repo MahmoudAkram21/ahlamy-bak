@@ -43,7 +43,17 @@ router.post("/purchase-for-dream", requireAuth, async (req, res) => {
         .json({ error: "You can only purchase plans for your own dreams" });
     }
 
-    if (dream.status !== "pending_payment") {
+    // Verify user profile to check if admin
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+
+    // For regular users, status must be pending_payment
+    // For admins, we allow bypass for convenience
+    if (dream.status !== "pending_payment" && !isAdmin) {
       return res.status(400).json({
         error: `Dream is not in pending_payment status. Current status: ${dream.status}`,
       });
