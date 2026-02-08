@@ -10,10 +10,6 @@ import bcrypt from "bcryptjs";
  * Run with: npm run prisma:seed
  */
 
-// const { PrismaClient } = require("@prisma/client");
-// const bcrypt = require("bcryptjs");
-
-
 async function main() {
   console.log("🌱 Starting database seed...");
 
@@ -108,7 +104,7 @@ async function main() {
   const adminEmail = "admin@mubasharat.com";
   const adminPassword = await bcrypt.hash("admin123", 10);
 
-  const adminUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: adminEmail },
     update: {},
     create: {

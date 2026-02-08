@@ -133,6 +133,76 @@ router.post('/', requireAuth, async (req, res) => {
   }
 });
 
+const EDIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+router.patch('/messages/:id', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: messageId } = req.params;
+    const { content } = req.body ?? {};
+
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({ error: 'content is required' });
+    }
+
+    const message = await prisma.chatMessage.findUnique({
+      where: { id: messageId },
+      include: {
+        request: {
+          select: {
+            dreamerId: true,
+            interpreterId: true,
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    if (message.senderId !== userId) {
+      return res.status(403).json({ error: 'Only the sender can edit this message' });
+    }
+
+    const request = message.request;
+    const isParticipant =
+      request.dreamerId === userId || request.interpreterId === userId;
+    if (!isParticipant) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const now = new Date();
+    const createdAt = new Date(message.createdAt);
+    const canEditUntil = new Date(createdAt.getTime() + EDIT_WINDOW_MS);
+    if (now > canEditUntil) {
+      return res.status(403).json({ error: 'Edit window has ended (10 minutes)' });
+    }
+
+    const updated = await prisma.chatMessage.update({
+      where: { id: messageId },
+      data: {
+        content: content.trim(),
+        editedAt: now,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    console.error('[Chat] PATCH message error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
 
 

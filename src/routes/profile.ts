@@ -123,6 +123,130 @@ router.post('/upload-avatar', requireAuth, async (req, res) => {
   }
 });
 
+const VISION_TYPES = ['gold_sa', 'silver_sa', 'bronze_sa', 'gold_eg', 'silver_eg', 'bronze_eg'] as const;
+
+function getMonthRange(monthParam?: string): { start: Date; end: Date } {
+  const now = new Date();
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split('-').map(Number);
+    return {
+      start: new Date(y, m - 1, 1),
+      end: new Date(y, m, 0, 23, 59, 59, 999),
+    };
+  }
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1),
+    end: new Date(),
+  };
+}
+
+router.get('/interpretation-stats-by-type/export', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const month = req.query.month as string | undefined;
+    const format = (req.query.format as string) || 'json';
+    const { start, end } = getMonthRange(month);
+
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true, fullName: true, email: true },
+    });
+    if (profile?.role !== 'interpreter') {
+      return res.status(403).json({ error: 'For interpreters only' });
+    }
+
+    const completed = await prisma.request.findMany({
+      where: {
+        status: 'completed',
+        interpreterId: userId,
+        completedAt: { gte: start, lte: end },
+      },
+      select: { dream: { select: { visionType: true } } },
+    });
+
+    const counts: Record<string, number> = Object.fromEntries(VISION_TYPES.map((t) => [t, 0]));
+    let total = 0;
+    for (const r of completed) {
+      const vt = r.dream?.visionType && VISION_TYPES.includes(r.dream.visionType as any) ? r.dream.visionType : 'other';
+      if (vt !== 'other') counts[vt] = (counts[vt] || 0) + 1;
+      total += 1;
+    }
+
+    const labels: Record<string, string> = {
+      gold_sa: 'ذهبي سعودي',
+      silver_sa: 'فضي سعودي',
+      bronze_sa: 'برونزي سعودي',
+      gold_eg: 'ذهبي مصري',
+      silver_eg: 'فضي مصري',
+      bronze_eg: 'برونزي مصري',
+    };
+
+    if (format === 'txt' || format === 'doc') {
+      let body = `إحصائيات الرؤى حسب النوع\nالفترة: ${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}\nالمفسر: ${profile.fullName || profile.email}\n\n`;
+      for (const t of VISION_TYPES) {
+        body += `${labels[t]}: ${counts[t] || 0}\n`;
+      }
+      body += `\nالإجمالي: ${total}\n`;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.txt"`);
+      return res.send(Buffer.from(body, 'utf-8'));
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.json"`);
+    return res.json({ month: month || 'current', start, end, counts, total, labels });
+  } catch (error) {
+    console.error('[Profile] Export stats error:', error);
+    return res.status(500).json({ error: 'Failed to export' });
+  }
+});
+
+router.get('/interpretation-stats-by-type', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const month = req.query.month as string | undefined;
+    const { start, end } = getMonthRange(month);
+
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (profile?.role !== 'interpreter') {
+      return res.status(403).json({ error: 'For interpreters only' });
+    }
+
+    const completed = await prisma.request.findMany({
+      where: {
+        status: 'completed',
+        interpreterId: userId,
+        completedAt: { gte: start, lte: end },
+      },
+      select: {
+        dream: { select: { visionType: true } },
+      },
+    });
+
+    const counts: Record<string, number> = Object.fromEntries(VISION_TYPES.map((t) => [t, 0]));
+    let total = 0;
+    for (const r of completed) {
+      const vt = r.dream?.visionType && VISION_TYPES.includes(r.dream.visionType as any) ? r.dream.visionType : 'other';
+      if (vt !== 'other') {
+        counts[vt] = (counts[vt] || 0) + 1;
+      }
+      total += 1;
+    }
+
+    return res.json({
+      month: month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+      start,
+      end,
+      counts,
+      total,
+    });
+  } catch (error) {
+    console.error('[Profile] Interpretation stats error:', error);
+    return res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
 router.delete('/account', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;

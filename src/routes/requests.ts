@@ -166,6 +166,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       select: {
         dreamerId: true,
         interpreterId: true,
+        dreamId: true,
       },
     });
 
@@ -199,14 +200,49 @@ router.patch('/:id', requireAuth, async (req, res) => {
     }
 
     const updateData: Record<string, unknown> = {};
-    if (status) updateData.status = status;
+    if (status) {
+      updateData.status = status;
+      if (status === 'completed') {
+        updateData.completedAt = new Date();
+      }
+    }
     if (interpreterId) updateData.interpreterId = interpreterId;
-    if (interpreterId && !status) {
+    if (interpreterId !== undefined && interpreterId !== null && !status) {
       updateData.status = 'in_progress';
+    }
+    // When interpreter returns, clear request's interpreter so admin can reassign
+    if (status === 'returned' && isInterpreter) {
+      updateData.interpreterId = null;
     }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid updates provided' });
+    }
+
+    // When interpreter returns the vision: sync Dream (returned, unassign) so admin can redistribute
+    if (status === 'returned' && isInterpreter) {
+      await prisma.dream.update({
+        where: { id: existingRequest.dreamId },
+        data: {
+          status: 'returned',
+          interpreterId: null,
+        },
+      });
+    }
+
+    // When request is marked completed by interpreter: increment totalInterpretations only if
+    // the dream was not already marked interpreted (avoid double count with dream page flow)
+    if (status === 'completed' && existingRequest.interpreterId) {
+      const dreamRow = await prisma.dream.findUnique({
+        where: { id: existingRequest.dreamId },
+        select: { status: true },
+      });
+      if (!dreamRow || dreamRow.status !== 'interpreted') {
+        await prisma.profile.update({
+          where: { id: existingRequest.interpreterId },
+          data: { totalInterpretations: { increment: 1 } },
+        });
+      }
     }
 
     const updatedRequest = await prisma.request.update({

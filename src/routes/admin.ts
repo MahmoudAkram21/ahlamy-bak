@@ -387,6 +387,173 @@ router.get('/interpreters', requireAuth, async (req, res) => {
   }
 });
 
+const VISION_TYPES = ['gold_sa', 'silver_sa', 'bronze_sa', 'gold_eg', 'silver_eg', 'bronze_eg'] as const;
+
+function getMonthRange(monthParam?: string): { start: Date; end: Date } {
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split('-').map(Number);
+    start = new Date(y, m - 1, 1);
+    end = new Date(y, m, 0, 23, 59, 59, 999);
+  } else {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+    end = new Date();
+  }
+  return { start, end };
+}
+
+router.get('/interpreters/stats-by-type', requireAuth, async (req, res) => {
+  try {
+    const hasAccess = await ensureRole(req.user!.userId, ['admin', 'super_admin']);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+    const month = req.query.month as string | undefined;
+    const { start, end } = getMonthRange(month);
+
+    const completed = await prisma.request.findMany({
+      where: {
+        status: 'completed',
+        completedAt: { gte: start, lte: end },
+        interpreterId: { not: null },
+      },
+      select: {
+        interpreterId: true,
+        dream: {
+          select: { visionType: true },
+        },
+      },
+    });
+
+    const byInterpreter: Record<string, { fullName: string; email: string; counts: Record<string, number>; total: number }> = {};
+    const interpreterIds = [...new Set(completed.map((r) => r.interpreterId).filter(Boolean))] as string[];
+    if (interpreterIds.length > 0) {
+      const profiles = await prisma.profile.findMany({
+        where: { id: { in: interpreterIds } },
+        select: { id: true, fullName: true, email: true },
+      });
+      for (const p of profiles) {
+        byInterpreter[p.id] = {
+          fullName: p.fullName || '',
+          email: p.email,
+          counts: Object.fromEntries(VISION_TYPES.map((t) => [t, 0])),
+          total: 0,
+        };
+      }
+    }
+    for (const r of completed) {
+      const iid = r.interpreterId!;
+      if (!byInterpreter[iid]) continue;
+      const vt = r.dream?.visionType && VISION_TYPES.includes(r.dream.visionType as any) ? r.dream.visionType : 'other';
+      if (vt !== 'other') {
+        byInterpreter[iid].counts[vt] = (byInterpreter[iid].counts[vt] || 0) + 1;
+      }
+      byInterpreter[iid].total += 1;
+    }
+
+    const list = Object.entries(byInterpreter).map(([interpreterId, data]) => ({
+      interpreterId,
+      ...data,
+    }));
+
+    return res.json({ month: month || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`, start, end, stats: list });
+  } catch (error) {
+    console.error('[Admin] Stats by type error:', error);
+    return res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+router.get('/interpreters/stats-by-type/export', requireAuth, async (req, res) => {
+  try {
+    const hasAccess = await ensureRole(req.user!.userId, ['admin', 'super_admin']);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+    const month = req.query.month as string | undefined;
+    const format = (req.query.format as string) || 'json';
+    const { start, end } = getMonthRange(month);
+
+    const completed = await prisma.request.findMany({
+      where: {
+        status: 'completed',
+        completedAt: { gte: start, lte: end },
+        interpreterId: { not: null },
+      },
+      select: {
+        interpreterId: true,
+        dream: { select: { visionType: true } },
+      },
+    });
+
+    const byInterpreter: Record<string, { fullName: string; email: string; counts: Record<string, number>; total: number }> = {};
+    const interpreterIds = [...new Set(completed.map((r) => r.interpreterId).filter(Boolean))] as string[];
+    if (interpreterIds.length > 0) {
+      const profiles = await prisma.profile.findMany({
+        where: { id: { in: interpreterIds } },
+        select: { id: true, fullName: true, email: true },
+      });
+      for (const p of profiles) {
+        byInterpreter[p.id] = {
+          fullName: p.fullName || '',
+          email: p.email,
+          counts: Object.fromEntries(VISION_TYPES.map((t) => [t, 0])),
+          total: 0,
+        };
+      }
+    }
+    for (const r of completed) {
+      const iid = r.interpreterId!;
+      if (!byInterpreter[iid]) continue;
+      const vt = r.dream?.visionType && VISION_TYPES.includes(r.dream.visionType as any) ? r.dream.visionType : 'other';
+      if (vt !== 'other') {
+        byInterpreter[iid].counts[vt] = (byInterpreter[iid].counts[vt] || 0) + 1;
+      }
+      byInterpreter[iid].total += 1;
+    }
+
+    const list = Object.entries(byInterpreter).map(([interpreterId, data]) => ({ interpreterId, ...data }));
+    const labels: Record<string, string> = {
+      gold_sa: 'ذهبي سعودي',
+      silver_sa: 'فضي سعودي',
+      bronze_sa: 'برونزي سعودي',
+      gold_eg: 'ذهبي مصري',
+      silver_eg: 'فضي مصري',
+      bronze_eg: 'برونزي مصري',
+    };
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.json"`);
+      return res.json({ month: month || 'current', start, end, stats: list, labels });
+    }
+    if (format === 'txt' || format === 'doc') {
+      let body = `إحصائيات الرؤى حسب النوع\nالفترة: ${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}\n\n`;
+      for (const [, data] of list) {
+        body += `${data.fullName || data.email}\n`;
+        for (const t of VISION_TYPES) {
+          body += `  ${labels[t]}: ${data.counts[t] || 0}\n`;
+        }
+        body += `  الإجمالي: ${data.total}\n\n`;
+      }
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.txt"`);
+      return res.send(Buffer.from(body, 'utf-8'));
+    }
+    if (format === 'pdf') {
+      const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إحصائيات الرؤى</title></head><body style="font-family: Arial; padding: 20px;"><h1>إحصائيات الرؤى حسب النوع</h1><p>الفترة: ${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}</p><table border="1" cellpadding="8" style="border-collapse: collapse;">${list.map(([, d]) => `<tr><td>${d.fullName || d.email}</td><td>${VISION_TYPES.map((t) => `${labels[t]}: ${d.counts[t] || 0}`).join(' | ')}</td><td>الإجمالي: ${d.total}</td></tr>`).join('')}</table></body></html>`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="vision-stats-${month || 'current'}.html"`);
+      return res.send(Buffer.from(html, 'utf-8'));
+    }
+    return res.status(400).json({ error: 'Unsupported format. Use json, txt, doc, or pdf' });
+  } catch (error) {
+    console.error('[Admin] Export stats error:', error);
+    return res.status(500).json({ error: 'Failed to export' });
+  }
+});
+
 export default router;
 
 

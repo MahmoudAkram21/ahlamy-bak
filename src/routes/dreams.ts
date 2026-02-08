@@ -308,6 +308,9 @@ router.get("/:id", requireAuth, async (req, res) => {
             avatarUrl: true,
           },
         },
+        interpreterRating: {
+          select: { rating: true },
+        },
       },
     });
 
@@ -333,6 +336,67 @@ router.get("/:id", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("[Dreams] Fetch single error:", error);
     return res.status(500).json({ error: "Failed to fetch dream" });
+  }
+});
+
+router.post("/:id/rate", requireAuth, async (req, res) => {
+  try {
+    const { id: dreamId } = req.params;
+    const userId = req.user!.userId;
+    const { rating: ratingValue } = req.body ?? {};
+
+    const rating = typeof ratingValue === "number" ? ratingValue : parseInt(String(ratingValue), 10);
+    if (Number.isNaN(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "rating must be a number between 1 and 5" });
+    }
+
+    const dream = await prisma.dream.findUnique({
+      where: { id: dreamId },
+      select: { dreamerId: true, interpreterId: true, status: true },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: "Dream not found" });
+    }
+    if (dream.dreamerId !== userId) {
+      return res.status(403).json({ error: "Only the dreamer can rate the interpreter for this dream" });
+    }
+    if (dream.status !== "interpreted") {
+      return res.status(400).json({ error: "Can only rate after the dream has been interpreted" });
+    }
+    if (!dream.interpreterId) {
+      return res.status(400).json({ error: "No interpreter assigned to this dream" });
+    }
+
+    const interpreterId = dream.interpreterId;
+
+    await prisma.interpreterRating.upsert({
+      where: { dreamId },
+      create: {
+        dreamId,
+        interpreterId,
+        dreamerId: userId,
+        rating,
+      },
+      update: { rating },
+    });
+
+    const allRatings = await prisma.interpreterRating.findMany({
+      where: { interpreterId },
+      select: { rating: true },
+    });
+    const avg = allRatings.reduce((s, r) => s + r.rating, 0) / allRatings.length;
+    const rounded = Math.round(avg * 100) / 100;
+
+    await prisma.profile.update({
+      where: { id: interpreterId },
+      data: { rating: rounded },
+    });
+
+    return res.json({ success: true, rating: rounded });
+  } catch (error) {
+    console.error("[Dreams] Rate error:", error);
+    return res.status(500).json({ error: "Failed to save rating" });
   }
 });
 
@@ -375,6 +439,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
         });
       }
       updateData.status = status;
+      if (status === "returned") {
+        updateData.interpreterId = null;
+      }
     }
     if (interpretation) {
       if (!isSuperAdmin && !isInterpreter) {
@@ -429,6 +496,56 @@ router.patch("/:id", requireAuth, async (req, res) => {
         },
       },
     });
+
+    // When interpreter marks dream as interpreted: increment totalInterpretations only if
+    // the request for this dream was not already completed (avoid double count)
+    if (status === "interpreted" && dream.interpreterId) {
+      const req = await prisma.request.findFirst({
+        where: { dreamId: id },
+        select: { status: true },
+      });
+      if (!req || req.status !== "completed") {
+        await prisma.profile.update({
+          where: { id: dream.interpreterId },
+          data: { totalInterpretations: { increment: 1 } },
+        });
+      }
+    }
+
+    // When dream is returned (by dreamer or interpreter via dreams API): sync Request(s)
+    if (status === "returned") {
+      await prisma.request.updateMany({
+        where: { dreamId: id },
+        data: { status: "returned", interpreterId: null },
+      });
+    }
+
+    // Sync Request when admin assigns interpreter: so interpreter sees it in their dashboard
+    if (interpreter_id) {
+      const existingRequest = await prisma.request.findFirst({
+        where: { dreamId: id },
+      });
+      if (existingRequest) {
+        await prisma.request.update({
+          where: { id: existingRequest.id },
+          data: {
+            interpreterId: interpreter_id,
+            status: "in_progress",
+          },
+        });
+      } else {
+        await prisma.request.create({
+          data: {
+            dreamId: id,
+            dreamerId: dream.dreamerId,
+            interpreterId: interpreter_id,
+            title: dream.title,
+            description: dream.description ?? undefined,
+            status: "in_progress",
+          },
+        });
+      }
+    }
 
     return res.json(updatedDream);
   } catch (error) {
