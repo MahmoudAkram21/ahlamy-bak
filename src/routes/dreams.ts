@@ -30,6 +30,25 @@ function countContentLetters(content: string) {
   return Array.from(content).length;
 }
 
+const dreamListInclude = {
+  dreamer: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      avatarUrl: true,
+    },
+  },
+  interpreter: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      avatarUrl: true,
+    },
+  },
+};
+
 router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -49,71 +68,21 @@ router.get("/", requireAuth, async (req, res) => {
       dreams = await prisma.dream.findMany({
         where: { dreamerId: userId },
         orderBy: { createdAt: "desc" },
-        include: {
-          dreamer: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-          interpreter: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-        },
+        include: dreamListInclude,
       });
     } else if (profile.role === "interpreter") {
       dreams = await prisma.dream.findMany({
         where: {
-          OR: [{ interpreterId: userId }, { interpreterId: null }],
+          interpreterId: userId,
+          status: { not: "pending_payment" },
         },
         orderBy: { createdAt: "desc" },
-        include: {
-          dreamer: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-          interpreter: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-        },
+        include: dreamListInclude,
       });
     } else if (profile.role === "admin" || profile.role === "super_admin") {
       dreams = await prisma.dream.findMany({
         orderBy: { createdAt: "desc" },
-        include: {
-          dreamer: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-          interpreter: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-        },
+        include: dreamListInclude,
       });
     } else {
       return res.status(403).json({ error: "Invalid role" });
@@ -123,6 +92,73 @@ router.get("/", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("[Dreams] Fetch error:", error);
     return res.status(500).json({ error: "Failed to fetch dreams" });
+  }
+});
+
+/** Dreamer (and admin): dreams they submitted for interpretation */
+router.get("/my-dreams", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    if (
+      profile.role !== "dreamer" &&
+      profile.role !== "admin" &&
+      profile.role !== "super_admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Only dreamers can list their dreams" });
+    }
+    const dreams = await prisma.dream.findMany({
+      where: { dreamerId: userId },
+      orderBy: { createdAt: "desc" },
+      include: dreamListInclude,
+    });
+    return res.json(dreams);
+  } catch (error) {
+    console.error("[Dreams] My dreams fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch my dreams" });
+  }
+});
+
+/** Interpreter (and admin): dreams assigned to them for interpretation */
+router.get("/assigned", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    if (
+      profile.role !== "interpreter" &&
+      profile.role !== "admin" &&
+      profile.role !== "super_admin"
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Only interpreters can list assigned dreams" });
+    }
+    const dreams = await prisma.dream.findMany({
+      where: {
+        interpreterId: userId,
+        status: { not: "pending_payment" },
+      },
+      orderBy: { createdAt: "desc" },
+      include: dreamListInclude,
+    });
+    return res.json(dreams);
+  } catch (error) {
+    console.error("[Dreams] Assigned dreams fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch assigned dreams" });
   }
 });
 
@@ -251,13 +287,12 @@ router.get("/stats", requireAuth, async (req, res) => {
     }
 
     let where: Record<string, unknown> = {};
-
     if (profile.role === "interpreter") {
-      where = {
-        OR: [{ interpreterId: userId }, { interpreterId: null }],
-      };
+      where = { interpreterId: userId };
     } else if (profile.role === "dreamer") {
       where = { dreamerId: userId };
+    } else if (profile.role === "admin" || profile.role === "super_admin") {
+      where = {};
     }
 
     const dreams = await prisma.dream.findMany({
@@ -265,16 +300,27 @@ router.get("/stats", requireAuth, async (req, res) => {
       select: { status: true },
     });
 
+    const isInterpreter = profile.role === "interpreter";
+    const dreamsForStats = isInterpreter
+      ? dreams.filter((d) => d.status !== "pending_payment")
+      : dreams;
+
     const stats = {
-      total: dreams.length,
-      new: dreams.filter((d) => d.status === "new").length,
-      pending_inquiry: dreams.filter((d) => d.status === "pending_inquiry")
-        .length,
-      pending_interpretation: dreams.filter(
+      total: dreamsForStats.length,
+      new: dreamsForStats.filter((d) => d.status === "new").length,
+      pending_payment: isInterpreter
+        ? 0
+        : dreams.filter((d) => d.status === "pending_payment").length,
+      pending_inquiry: dreamsForStats.filter(
+        (d) => d.status === "pending_inquiry"
+      ).length,
+      pending_interpretation: dreamsForStats.filter(
         (d) => d.status === "pending_interpretation"
       ).length,
-      interpreted: dreams.filter((d) => d.status === "interpreted").length,
-      returned: dreams.filter((d) => d.status === "returned").length,
+      interpreted: dreamsForStats.filter(
+        (d) => d.status === "interpreted"
+      ).length,
+      returned: dreamsForStats.filter((d) => d.status === "returned").length,
     };
 
     return res.json(stats);
@@ -329,6 +375,12 @@ router.get("/:id", requireAuth, async (req, res) => {
       dream.dreamerId === userId || dream.interpreterId === userId || isAdmin;
 
     if (!hasAccess) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const isInterpreterViewer =
+      profile?.role === "interpreter" && dream.interpreterId === userId;
+    if (isInterpreterViewer && dream.status === "pending_payment") {
       return res.status(403).json({ error: "Forbidden" });
     }
 

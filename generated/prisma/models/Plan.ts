@@ -68,6 +68,7 @@ export type PlanCountAggregateOutputType = {
   currency: number
   letterQuota: number
   features: number
+  countryCodes: number
   isActive: number
   createdAt: number
   updatedAt: number
@@ -117,6 +118,7 @@ export type PlanCountAggregateInputType = {
   currency?: true
   letterQuota?: true
   features?: true
+  countryCodes?: true
   isActive?: true
   createdAt?: true
   updatedAt?: true
@@ -217,6 +219,7 @@ export type PlanGroupByOutputType = {
   currency: string
   letterQuota: number
   features: runtime.JsonValue
+  countryCodes: runtime.JsonValue | null
   isActive: boolean
   createdAt: Date
   updatedAt: Date
@@ -253,6 +256,7 @@ export type PlanWhereInput = {
   currency?: Prisma.StringFilter<"Plan"> | string
   letterQuota?: Prisma.IntFilter<"Plan"> | number
   features?: Prisma.JsonFilter<"Plan">
+  countryCodes?: Prisma.JsonNullableFilter<"Plan">
   isActive?: Prisma.BoolFilter<"Plan"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Plan"> | Date | string
@@ -271,6 +275,7 @@ export type PlanOrderByWithRelationInput = {
   currency?: Prisma.SortOrder
   letterQuota?: Prisma.SortOrder
   features?: Prisma.SortOrder
+  countryCodes?: Prisma.SortOrderInput | Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -293,6 +298,7 @@ export type PlanWhereUniqueInput = Prisma.AtLeast<{
   currency?: Prisma.StringFilter<"Plan"> | string
   letterQuota?: Prisma.IntFilter<"Plan"> | number
   features?: Prisma.JsonFilter<"Plan">
+  countryCodes?: Prisma.JsonNullableFilter<"Plan">
   isActive?: Prisma.BoolFilter<"Plan"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Plan"> | Date | string
@@ -311,6 +317,7 @@ export type PlanOrderByWithAggregationInput = {
   currency?: Prisma.SortOrder
   letterQuota?: Prisma.SortOrder
   features?: Prisma.SortOrder
+  countryCodes?: Prisma.SortOrderInput | Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -332,6 +339,7 @@ export type PlanScalarWhereWithAggregatesInput = {
   currency?: Prisma.StringWithAggregatesFilter<"Plan"> | string
   letterQuota?: Prisma.IntWithAggregatesFilter<"Plan"> | number
   features?: Prisma.JsonWithAggregatesFilter<"Plan">
+  countryCodes?: Prisma.JsonNullableWithAggregatesFilter<"Plan">
   isActive?: Prisma.BoolWithAggregatesFilter<"Plan"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Plan"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Plan"> | Date | string
@@ -345,6 +353,7 @@ export type PlanCreateInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -363,6 +372,7 @@ export type PlanUncheckedCreateInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -381,6 +391,7 @@ export type PlanUpdateInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -399,6 +410,7 @@ export type PlanUncheckedUpdateInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -417,6 +429,7 @@ export type PlanCreateManyInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -430,6 +443,7 @@ export type PlanUpdateManyMutationInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -443,6 +457,7 @@ export type PlanUncheckedUpdateManyInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -467,6 +482,7 @@ export type PlanCountOrderByAggregateInput = {
   currency?: Prisma.SortOrder
   letterQuota?: Prisma.SortOrder
   features?: Prisma.SortOrder
+  countryCodes?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -593,6 +609,7 @@ export type PlanCreateWithoutProfilesUsingPlanInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -610,6 +627,7 @@ export type PlanUncheckedCreateWithoutProfilesUsingPlanInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -643,6 +661,7 @@ export type PlanUpdateWithoutProfilesUsingPlanInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -660,6 +679,7 @@ export type PlanUncheckedUpdateWithoutProfilesUsingPlanInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -677,6 +697,7 @@ export type PlanCreateWithoutDreamsInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -694,6 +715,7 @@ export type PlanUncheckedCreateWithoutDreamsInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -727,6 +749,7 @@ export type PlanUpdateWithoutDreamsInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -744,6 +767,7 @@ export type PlanUncheckedUpdateWithoutDreamsInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -761,6 +785,7 @@ export type PlanCreateWithoutUserPlansInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -778,6 +803,7 @@ export type PlanUncheckedCreateWithoutUserPlansInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -811,6 +837,7 @@ export type PlanUpdateWithoutUserPlansInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -828,6 +855,7 @@ export type PlanUncheckedUpdateWithoutUserPlansInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -845,6 +873,7 @@ export type PlanCreateWithoutPaymentsInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -862,6 +891,7 @@ export type PlanUncheckedCreateWithoutPaymentsInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -895,6 +925,7 @@ export type PlanUpdateWithoutPaymentsInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -912,6 +943,7 @@ export type PlanUncheckedUpdateWithoutPaymentsInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -929,6 +961,7 @@ export type PlanCreateWithoutDreamPurchasesInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -946,6 +979,7 @@ export type PlanUncheckedCreateWithoutDreamPurchasesInput = {
   currency: string
   letterQuota: number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -979,6 +1013,7 @@ export type PlanUpdateWithoutDreamPurchasesInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -996,6 +1031,7 @@ export type PlanUncheckedUpdateWithoutDreamPurchasesInput = {
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   letterQuota?: Prisma.IntFieldUpdateOperationsInput | number
   features?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  countryCodes?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1080,6 +1116,7 @@ export type PlanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   currency?: boolean
   letterQuota?: boolean
   features?: boolean
+  countryCodes?: boolean
   isActive?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1101,12 +1138,13 @@ export type PlanSelectScalar = {
   currency?: boolean
   letterQuota?: boolean
   features?: boolean
+  countryCodes?: boolean
   isActive?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "price" | "currency" | "letterQuota" | "features" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["plan"]>
+export type PlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "price" | "currency" | "letterQuota" | "features" | "countryCodes" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["plan"]>
 export type PlanInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   payments?: boolean | Prisma.Plan$paymentsArgs<ExtArgs>
   dreamPurchases?: boolean | Prisma.Plan$dreamPurchasesArgs<ExtArgs>
@@ -1133,6 +1171,7 @@ export type $PlanPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     currency: string
     letterQuota: number
     features: runtime.JsonValue
+    countryCodes: runtime.JsonValue | null
     isActive: boolean
     createdAt: Date
     updatedAt: Date
@@ -1517,6 +1556,7 @@ export interface PlanFieldRefs {
   readonly currency: Prisma.FieldRef<"Plan", 'String'>
   readonly letterQuota: Prisma.FieldRef<"Plan", 'Int'>
   readonly features: Prisma.FieldRef<"Plan", 'Json'>
+  readonly countryCodes: Prisma.FieldRef<"Plan", 'Json'>
   readonly isActive: Prisma.FieldRef<"Plan", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"Plan", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Plan", 'DateTime'>

@@ -1481,6 +1481,7 @@ export const PlanScalarFieldEnum = {
   currency: 'currency',
   letterQuota: 'letterQuota',
   features: 'features',
+  countryCodes: 'countryCodes',
   isActive: 'isActive',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

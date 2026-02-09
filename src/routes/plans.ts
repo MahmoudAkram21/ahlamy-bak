@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { optionalAuth, requireAuth } from "../middleware/auth";
 
@@ -18,24 +17,43 @@ function formatPlan(plan: any) {
       : plan.features
       ? JSON.parse(plan.features)
       : [],
+    countryCodes: Array.isArray(plan.countryCodes)
+      ? plan.countryCodes
+      : plan.countryCodes
+      ? (typeof plan.countryCodes === "string" ? JSON.parse(plan.countryCodes) : plan.countryCodes)
+      : null,
     isActive: plan.isActive,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
 }
 
+function planAvailableInCountry(plan: { countryCodes: unknown }, country: string): boolean {
+  const codes = plan.countryCodes;
+  if (codes == null) return true;
+  if (!Array.isArray(codes)) return true;
+  if (codes.length === 0) return true;
+  const upper = country.toUpperCase();
+  return codes.some((c: unknown) => String(c).toUpperCase() === upper);
+}
+
 router.get("/", optionalAuth, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === "true";
+    const country = typeof req.query.country === "string" ? req.query.country.trim() : null;
     const requesterRole = req.user?.role;
 
     const isElevated =
       requesterRole === "admin" || requesterRole === "super_admin";
 
-    const plans = await prisma.plan.findMany({
+    let plans = await prisma.plan.findMany({
       where: includeInactive && isElevated ? {} : { isActive: true },
       orderBy: { price: "asc" },
     });
+
+    if (country) {
+      plans = plans.filter((p) => planAvailableInCountry(p as { countryCodes: unknown }, country));
+    }
 
     return res.json({ plans: plans.map(formatPlan) });
   } catch (error) {
@@ -59,6 +77,7 @@ router.post("/", requireAuth, async (req, res) => {
       currency,
       letterQuota,
       features,
+      countryCodes,
       isActive = true,
     } = req.body ?? {};
 
@@ -82,10 +101,11 @@ router.post("/", requireAuth, async (req, res) => {
       data: {
         name,
         description,
-        price: new Prisma.Decimal(price),
+        price: Number(price),
         currency: currency.toUpperCase(),
         letterQuota: Number(letterQuota),
         features: features ?? [],
+        countryCodes: Array.isArray(countryCodes) ? countryCodes : countryCodes ?? undefined,
         isActive: Boolean(isActive),
       },
     });
@@ -120,6 +140,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
       currency,
       letterQuota,
       features,
+      countryCodes,
       isActive,
     } = req.body ?? {};
 
@@ -128,13 +149,16 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (price !== undefined && !Number.isNaN(Number(price))) {
-      updateData.price = new Prisma.Decimal(price);
+      updateData.price = Number(price);
     }
     if (currency !== undefined) updateData.currency = currency.toUpperCase();
     if (letterQuota !== undefined && !Number.isNaN(Number(letterQuota))) {
       updateData.letterQuota = Number(letterQuota);
     }
     if (features !== undefined) updateData.features = features;
+    if (countryCodes !== undefined) {
+      updateData.countryCodes = Array.isArray(countryCodes) ? countryCodes : countryCodes;
+    }
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
     const plan = await prisma.plan.update({

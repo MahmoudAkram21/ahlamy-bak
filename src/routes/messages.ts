@@ -169,6 +169,12 @@ router.post('/', requireAuth, async (req, res) => {
       },
     };
 
+    // Broadcast to WebSocket room so other participant sees the message in real time
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`dream:${dream_id}`).emit('message:new', anonymousMessage);
+    }
+
     return res.status(201).json(anonymousMessage);
   } catch (error) {
     console.error('[Messages] Create error:', error);
