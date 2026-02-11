@@ -3,6 +3,7 @@ import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '../utils/auth';
+import { buildAdminVisionStatsPdf } from '../utils/pdf-vision-stats';
 
 const router = Router();
 
@@ -29,14 +30,23 @@ router.get('/stats', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden - Admin access required' });
     }
 
-    const [totalUsers, totalRequests, completedRequests, totalPlans, totalRevenueAggregate] = await Promise.all([
+    const [
+      totalUsers,
+      completedRequests,
+      totalPlans,
+      totalRevenueAggregate,
+      dreamsRaw,
+    ] = await Promise.all([
       prisma.profile.count(),
-      prisma.request.count(),
       prisma.request.count({ where: { status: 'completed' } }),
       prisma.plan.count(),
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: { status: 'succeeded' },
+      }),
+      prisma.dream.groupBy({
+        by: ['status'],
+        _count: { id: true },
       }),
     ]);
 
@@ -44,12 +54,32 @@ router.get('/stats', requireAuth, async (req, res) => {
       ? Number(totalRevenueAggregate._sum.amount)
       : 0;
 
+    const totalRequests = await prisma.request.count();
+    const dreamsByStatus = dreamsRaw.reduce(
+      (acc, row) => {
+        acc[row.status] = row._count.id;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    const totalDreams =
+      dreamsRaw.reduce((sum, row) => sum + row._count.id, 0);
+
     const stats = {
       totalUsers,
       totalRequests,
       completedRequests,
       totalPlans,
       totalRevenue,
+      totalDreams,
+      dreams: {
+        new: dreamsByStatus.new ?? 0,
+        pending_payment: dreamsByStatus.pending_payment ?? 0,
+        pending_inquiry: dreamsByStatus.pending_inquiry ?? 0,
+        pending_interpretation: dreamsByStatus.pending_interpretation ?? 0,
+        interpreted: dreamsByStatus.interpreted ?? 0,
+        returned: dreamsByStatus.returned ?? 0,
+      },
     };
 
     return res.json({ stats });
@@ -406,9 +436,9 @@ function getMonthRange(monthParam?: string): { start: Date; end: Date } {
 
 router.get('/interpreters/stats-by-type', requireAuth, async (req, res) => {
   try {
-    const hasAccess = await ensureRole(req.user!.userId, ['admin', 'super_admin']);
+    const hasAccess = await ensureRole(req.user!.userId, ['super_admin']);
     if (!hasAccess) {
-      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+      return res.status(403).json({ error: 'Forbidden - Super admin only' });
     }
     const month = req.query.month as string | undefined;
     const { start, end } = getMonthRange(month);
@@ -467,9 +497,9 @@ router.get('/interpreters/stats-by-type', requireAuth, async (req, res) => {
 
 router.get('/interpreters/stats-by-type/export', requireAuth, async (req, res) => {
   try {
-    const hasAccess = await ensureRole(req.user!.userId, ['admin', 'super_admin']);
+    const hasAccess = await ensureRole(req.user!.userId, ['super_admin']);
     if (!hasAccess) {
-      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+      return res.status(403).json({ error: 'Forbidden - Super admin only' });
     }
     const month = req.query.month as string | undefined;
     const format = (req.query.format as string) || 'json';
@@ -530,7 +560,7 @@ router.get('/interpreters/stats-by-type/export', requireAuth, async (req, res) =
     }
     if (format === 'txt' || format === 'doc') {
       let body = `إحصائيات الرؤى حسب النوع\nالفترة: ${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}\n\n`;
-      for (const [, data] of list) {
+      for (const data of list) {
         body += `${data.fullName || data.email}\n`;
         for (const t of VISION_TYPES) {
           body += `  ${labels[t]}: ${data.counts[t] || 0}\n`;
@@ -542,15 +572,73 @@ router.get('/interpreters/stats-by-type/export', requireAuth, async (req, res) =
       return res.send(Buffer.from(body, 'utf-8'));
     }
     if (format === 'pdf') {
-      const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إحصائيات الرؤى</title></head><body style="font-family: Arial; padding: 20px;"><h1>إحصائيات الرؤى حسب النوع</h1><p>الفترة: ${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}</p><table border="1" cellpadding="8" style="border-collapse: collapse;">${list.map(([, d]) => `<tr><td>${d.fullName || d.email}</td><td>${VISION_TYPES.map((t) => `${labels[t]}: ${d.counts[t] || 0}`).join(' | ')}</td><td>الإجمالي: ${d.total}</td></tr>`).join('')}</table></body></html>`;
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Disposition', `inline; filename="vision-stats-${month || 'current'}.html"`);
-      return res.send(Buffer.from(html, 'utf-8'));
+      const dateRange = `${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}`;
+      const pdfRows = list.map((d) => ({
+        fullName: d.fullName || '',
+        email: d.email,
+        counts: d.counts,
+        total: d.total,
+      }));
+      const pdfBuffer = await buildAdminVisionStatsPdf({
+        dateRange,
+        monthLabel: month || 'current',
+        rows: pdfRows,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.pdf"`);
+      return res.send(pdfBuffer);
     }
     return res.status(400).json({ error: 'Unsupported format. Use json, txt, doc, or pdf' });
   } catch (error) {
     console.error('[Admin] Export stats error:', error);
     return res.status(500).json({ error: 'Failed to export' });
+  }
+});
+
+// --- Super admin: manage comment visibility (approve / hide for "اراء عملاء احلامي") ---
+router.get('/comments', requireAuth, async (req, res) => {
+  try {
+    const isSuperAdmin = await ensureRole(req.user!.userId, ['super_admin']);
+    if (!isSuperAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Super admin only' });
+    }
+    const comments = await prisma.comment.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: { id: true, fullName: true, email: true },
+        },
+        dream: {
+          select: { id: true, title: true },
+        },
+      },
+    });
+    return res.json({ comments });
+  } catch (error) {
+    console.error('[Admin] Comments list error:', error);
+    return res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+router.patch('/comments/:id', requireAuth, async (req, res) => {
+  try {
+    const isSuperAdmin = await ensureRole(req.user!.userId, ['super_admin']);
+    if (!isSuperAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Super admin only' });
+    }
+    const { id } = req.params;
+    const { isApproved } = req.body ?? {};
+    if (typeof isApproved !== 'boolean') {
+      return res.status(400).json({ error: 'isApproved (boolean) required' });
+    }
+    const comment = await prisma.comment.update({
+      where: { id },
+      data: { isApproved },
+    });
+    return res.json(comment);
+  } catch (error) {
+    console.error('[Admin] Comment update error:', error);
+    return res.status(500).json({ error: 'Failed to update comment' });
   }
 });
 

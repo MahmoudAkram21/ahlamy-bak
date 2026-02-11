@@ -15,6 +15,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   profile   Profile?
+  notifications Notification[] // One-to-many relationship
+  preferences   NotificationPreference?
 
   @@map("users")
 }
@@ -115,16 +117,18 @@ enum MessageType {
 }
 
 model Comment {
-  id        String   @id @default(uuid())
-  dreamId   String   @map("dream_id")
-  userId    String   @map("user_id")
-  content   String
-  createdAt DateTime @default(now()) @map("created_at")
-  dream     Dream    @relation(fields: [dreamId], references: [id], onDelete: Cascade)
-  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  dreamId    String   @map("dream_id")
+  userId     String   @map("user_id")
+  content    String
+  isApproved Boolean  @default(false) @map("is_approved")
+  createdAt  DateTime @default(now()) @map("created_at")
+  dream      Dream    @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  user       Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([dreamId])
   @@index([userId], map: "comments_user_id_fkey")
+  @@index([isApproved])
   @@map("comments")
 }
 
@@ -239,11 +243,12 @@ model Request {
   budget        Decimal?      @db.Decimal(10, 2)
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
-  completedAt   DateTime?     @map("completed_at")
-  chatMessages  ChatMessage[]
-  dream         Dream         @relation(fields: [dreamId], references: [id], onDelete: Cascade)
-  dreamer       Profile       @relation("DreamerRequests", fields: [dreamerId], references: [id], onDelete: Cascade)
-  interpreter   Profile?      @relation("InterpreterRequests", fields: [interpreterId], references: [id])
+  completedAt         DateTime?   @map("completed_at")
+  pendingCompletionAt DateTime?   @map("pending_completion_at") // interpreter requested completion; auto-complete after this time if dreamer does not reply
+  chatMessages        ChatMessage[]
+  dream               Dream       @relation(fields: [dreamId], references: [id], onDelete: Cascade)
+  dreamer             Profile     @relation("DreamerRequests", fields: [dreamerId], references: [id], onDelete: Cascade)
+  interpreter        Profile?    @relation("InterpreterRequests", fields: [interpreterId], references: [id])
 
   @@index([dreamId], map: "requests_dream_id_fkey")
   @@index([dreamerId], map: "requests_dreamer_id_fkey")
@@ -291,6 +296,56 @@ model PageContent {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("page_contents")
+}
+
+model AppSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique @map("key") @db.VarChar(100)
+  value       String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("app_setting")
+}
+
+
+
+// Defines the core notification record
+model Notification {
+  id          String           @id @default(uuid())
+  type        NotificationType // Enum: LIKE, COMMENT, FOLLOW
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  
+  // Relations
+  recipientId String
+  recipient   User             @relation(fields: [recipientId], references: [id])
+  
+  // Optional: Link to the entity that triggered it (e.g., a post, a comment)
+  entityId    String?          // ID of the post/comment
+  entityType  String?          // 'POST', 'COMMENT'
+
+  @@index([recipientId, isRead]) // Optimize query for unread notifications
+}
+
+// Defines user preferences
+model NotificationPreference {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id])
+  
+  emailOnLike    Boolean @default(true)
+  emailOnFollow  Boolean @default(true)
+  inAppOnLike    Boolean @default(true)
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  SYSTEM
 }
 
 enum Role {

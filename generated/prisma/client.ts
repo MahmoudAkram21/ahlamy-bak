@@ -109,3 +109,18 @@ export type AdminLog = Prisma.AdminLogModel
  * 
  */
 export type PageContent = Prisma.PageContentModel
+/**
+ * Model AppSetting
+ * 
+ */
+export type AppSetting = Prisma.AppSettingModel
+/**
+ * Model Notification
+ * 
+ */
+export type Notification = Prisma.NotificationModel
+/**
+ * Model NotificationPreference
+ * 
+ */
+export type NotificationPreference = Prisma.NotificationPreferenceModel

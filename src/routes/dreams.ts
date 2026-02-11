@@ -1,9 +1,16 @@
 import { Router } from "express";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
+import { createNotification } from "../utils/notifications";
+import { applyPendingCompletionIfDue } from "../utils/requestCompletion";
 import { writeFile } from "fs/promises";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
+
+const VERIFICATION_MESSAGE =
+  "المفسر أنهى التفسير ويرجو التأكيد. إذا لم ترد خلال 10 دقائق سيُعتبر التفسير مكتملاً. هل توافق؟ (نعم / لا)";
+const PENDING_COMPLETION_MINUTES = 10;
+const EDIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes for dream content and message edits
 
 const router = Router();
 
@@ -273,6 +280,8 @@ router.post("/:id/audio", requireAuth, async (req, res) => {
   }
 });
 
+const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
 router.get("/stats", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -286,6 +295,10 @@ router.get("/stats", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
+    const isDreamerOrInterpreter =
+      profile.role === "dreamer" || profile.role === "interpreter";
+    const oneMonthAgo = new Date(Date.now() - ONE_MONTH_MS);
+
     let where: Record<string, unknown> = {};
     if (profile.role === "interpreter") {
       where = { interpreterId: userId };
@@ -293,6 +306,10 @@ router.get("/stats", requireAuth, async (req, res) => {
       where = { dreamerId: userId };
     } else if (profile.role === "admin" || profile.role === "super_admin") {
       where = {};
+    }
+
+    if (isDreamerOrInterpreter) {
+      where.createdAt = { gte: oneMonthAgo };
     }
 
     const dreams = await prisma.dream.findMany({
@@ -306,6 +323,7 @@ router.get("/stats", requireAuth, async (req, res) => {
       : dreams;
 
     const stats = {
+      period: isDreamerOrInterpreter ? "month" : "all",
       total: dreamsForStats.length,
       new: dreamsForStats.filter((d) => d.status === "new").length,
       pending_payment: isInterpreter
@@ -384,10 +402,243 @@ router.get("/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
+    // Apply 10-minute auto-completion if interpreter had requested completion and time passed
+    try {
+      const requestRow = dream.interpreterId
+        ? await prisma.request.findFirst({
+            where: {
+              dreamId: id,
+              interpreterId: dream.interpreterId,
+            },
+            select: { id: true },
+          })
+        : null;
+      if (requestRow) {
+        const applied = await applyPendingCompletionIfDue(prisma, requestRow.id);
+        if (applied) {
+          const updated = await prisma.dream.findUnique({
+            where: { id },
+            include: {
+              dreamer: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  avatarUrl: true,
+                },
+              },
+              interpreter: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  avatarUrl: true,
+                },
+              },
+              interpreterRating: {
+                select: { rating: true },
+              },
+            },
+          });
+          return res.json(updated ?? dream);
+        }
+      }
+    } catch (completionError) {
+      console.error("[Dreams] Pending completion check error (non-fatal):", completionError);
+      // Still return the dream so the page loads
+    }
+
     return res.json(dream);
   } catch (error) {
     console.error("[Dreams] Fetch single error:", error);
     return res.status(500).json({ error: "Failed to fetch dream" });
+  }
+});
+
+/** Interpreter requests completion: send verification message to dreamer, 10min timer; if no reply, dream becomes done */
+router.post("/:id/request-completion", requireAuth, async (req, res) => {
+  try {
+    const { id: dreamId } = req.params;
+    const userId = req.user!.userId;
+
+    const dream = await prisma.dream.findUnique({
+      where: { id: dreamId },
+      select: {
+        id: true,
+        status: true,
+        dreamerId: true,
+        interpreterId: true,
+      },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: "Dream not found" });
+    }
+    if (dream.interpreterId !== userId) {
+      return res.status(403).json({
+        error: "Only the assigned interpreter can request completion",
+      });
+    }
+    if (dream.status === "interpreted") {
+      return res.status(400).json({ error: "Dream is already interpreted" });
+    }
+
+    const request = await prisma.request.findFirst({
+      where: {
+        dreamId,
+        interpreterId: userId,
+      },
+      select: { id: true },
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: "Request not found for this dream" });
+    }
+
+    const deadline = new Date(Date.now() + PENDING_COMPLETION_MINUTES * 60 * 1000);
+
+    await prisma.request.update({
+      where: { id: request.id },
+      data: { pendingCompletionAt: deadline },
+    });
+
+    await prisma.chatMessage.create({
+      data: {
+        requestId: request.id,
+        senderId: userId,
+        content: VERIFICATION_MESSAGE,
+        messageType: "text",
+      },
+    });
+
+    // Also create a Dream Message so it appears in "الرسائل" on the dream page (same list the dreamer sees)
+    const dreamMessage = await prisma.message.create({
+      data: {
+        dreamId,
+        senderId: userId,
+        content: VERIFICATION_MESSAGE,
+        messageType: "text",
+      },
+      include: {
+        sender: { select: { id: true, role: true } },
+      },
+    });
+    const anonymousDreamMessage = {
+      ...dreamMessage,
+      sender: {
+        id: dreamMessage.sender.id,
+        role: dreamMessage.sender.role,
+        displayName: dreamMessage.sender.role === "dreamer" ? "الرائي" : "المفسر",
+      },
+    };
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`dream:${dreamId}`).emit("message:new", anonymousDreamMessage);
+    }
+
+    // Notify dreamer so they see it in the app (bell icon)
+    await createNotification(prisma, {
+      recipientId: dream.dreamerId,
+      type: "SYSTEM",
+      title: "طلب تأكيد من المفسر",
+      message: VERIFICATION_MESSAGE,
+      entityId: dreamId,
+      entityType: "DREAM",
+    });
+
+    return res.json({
+      success: true,
+      message:
+        "تم إرسال طلب التأكيد للرائي. إذا لم يرد خلال 10 دقائق سيُعتبر التفسير مكتملاً.",
+      pendingCompletionAt: deadline.toISOString(),
+    });
+  } catch (error) {
+    console.error("[Dreams] Request completion error:", error);
+    return res.status(500).json({ error: "Failed to request completion" });
+  }
+});
+
+/** Interpreter can reopen an interpreted dream to allow chat again */
+router.post("/:id/reopen", requireAuth, async (req, res) => {
+  try {
+    const { id: dreamId } = req.params;
+    const userId = req.user!.userId;
+
+    const dream = await prisma.dream.findUnique({
+      where: { id: dreamId },
+      select: {
+        id: true,
+        status: true,
+        interpreterId: true,
+      },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: "Dream not found" });
+    }
+    if (dream.interpreterId !== userId) {
+      return res.status(403).json({
+        error: "Only the assigned interpreter can reopen this dream",
+      });
+    }
+    if (dream.status !== "interpreted") {
+      return res.status(400).json({ error: "Dream is not interpreted" });
+    }
+
+    const requestRow = await prisma.request.findFirst({
+      where: {
+        dreamId,
+        interpreterId: userId,
+      },
+      select: { id: true },
+    });
+
+    if (!requestRow) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    await prisma.$transaction([
+      prisma.request.update({
+        where: { id: requestRow.id },
+        data: {
+          status: "in_progress",
+          completedAt: null,
+          pendingCompletionAt: null,
+        },
+      }),
+      prisma.dream.update({
+        where: { id: dreamId },
+        data: { status: "pending_interpretation" },
+      }),
+    ]);
+
+    const updated = await prisma.dream.findUnique({
+      where: { id: dreamId },
+      include: {
+        dreamer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        interpreter: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        interpreterRating: { select: { rating: true } },
+      },
+    });
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("[Dreams] Reopen error:", error);
+    return res.status(500).json({ error: "Failed to reopen dream" });
   }
 });
 
@@ -456,7 +707,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user!.userId;
-    const { status, interpretation, notes, interpreter_id } = req.body ?? {};
+    const { status, interpretation, notes, interpreter_id, content: dreamContent } = req.body ?? {};
 
     const dream = await prisma.dream.findUnique({ where: { id } });
 
@@ -483,6 +734,16 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }
 
     const updateData: Record<string, unknown> = {};
+    if (dreamContent !== undefined && typeof dreamContent === "string") {
+      if (!isDreamer && !isSuperAdmin) {
+        return res.status(403).json({ error: "Only the dreamer can edit dream content" });
+      }
+      const dreamCreatedAt = new Date((dream as { createdAt: Date }).createdAt).getTime();
+      if (Date.now() - dreamCreatedAt > EDIT_WINDOW_MS) {
+        return res.status(400).json({ error: "Dream content can only be edited within 10 minutes of creation" });
+      }
+      updateData.content = dreamContent.trim();
+    }
     if (status) {
       if (!canModifyContent && !isSuperAdmin) {
         return res.status(403).json({
@@ -546,8 +807,19 @@ router.patch("/:id", requireAuth, async (req, res) => {
             avatarUrl: true,
           },
         },
+        interpreterRating: { select: { rating: true } },
       },
     });
+
+    if (updateData.content !== undefined) {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`dream:${id}`).emit("dream:updated", {
+          id,
+          content: updatedDream.content,
+        });
+      }
+    }
 
     // When interpreter marks dream as interpreted: increment totalInterpretations only if
     // the request for this dream was not already completed (avoid double count)

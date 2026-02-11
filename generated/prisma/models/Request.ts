@@ -46,6 +46,7 @@ export type RequestMinAggregateOutputType = {
   createdAt: Date | null
   updatedAt: Date | null
   completedAt: Date | null
+  pendingCompletionAt: Date | null
 }
 
 export type RequestMaxAggregateOutputType = {
@@ -60,6 +61,7 @@ export type RequestMaxAggregateOutputType = {
   createdAt: Date | null
   updatedAt: Date | null
   completedAt: Date | null
+  pendingCompletionAt: Date | null
 }
 
 export type RequestCountAggregateOutputType = {
@@ -74,6 +76,7 @@ export type RequestCountAggregateOutputType = {
   createdAt: number
   updatedAt: number
   completedAt: number
+  pendingCompletionAt: number
   _all: number
 }
 
@@ -98,6 +101,7 @@ export type RequestMinAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   completedAt?: true
+  pendingCompletionAt?: true
 }
 
 export type RequestMaxAggregateInputType = {
@@ -112,6 +116,7 @@ export type RequestMaxAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   completedAt?: true
+  pendingCompletionAt?: true
 }
 
 export type RequestCountAggregateInputType = {
@@ -126,6 +131,7 @@ export type RequestCountAggregateInputType = {
   createdAt?: true
   updatedAt?: true
   completedAt?: true
+  pendingCompletionAt?: true
   _all?: true
 }
 
@@ -227,6 +233,7 @@ export type RequestGroupByOutputType = {
   createdAt: Date
   updatedAt: Date
   completedAt: Date | null
+  pendingCompletionAt: Date | null
   _count: RequestCountAggregateOutputType | null
   _avg: RequestAvgAggregateOutputType | null
   _sum: RequestSumAggregateOutputType | null
@@ -264,6 +271,7 @@ export type RequestWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
+  pendingCompletionAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
   chatMessages?: Prisma.ChatMessageListRelationFilter
   dream?: Prisma.XOR<Prisma.DreamScalarRelationFilter, Prisma.DreamWhereInput>
   dreamer?: Prisma.XOR<Prisma.ProfileScalarRelationFilter, Prisma.ProfileWhereInput>
@@ -282,6 +290,7 @@ export type RequestOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingCompletionAt?: Prisma.SortOrderInput | Prisma.SortOrder
   chatMessages?: Prisma.ChatMessageOrderByRelationAggregateInput
   dream?: Prisma.DreamOrderByWithRelationInput
   dreamer?: Prisma.ProfileOrderByWithRelationInput
@@ -304,6 +313,7 @@ export type RequestWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
+  pendingCompletionAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
   chatMessages?: Prisma.ChatMessageListRelationFilter
   dream?: Prisma.XOR<Prisma.DreamScalarRelationFilter, Prisma.DreamWhereInput>
   dreamer?: Prisma.XOR<Prisma.ProfileScalarRelationFilter, Prisma.ProfileWhereInput>
@@ -322,6 +332,7 @@ export type RequestOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pendingCompletionAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.RequestCountOrderByAggregateInput
   _avg?: Prisma.RequestAvgOrderByAggregateInput
   _max?: Prisma.RequestMaxOrderByAggregateInput
@@ -344,6 +355,7 @@ export type RequestScalarWhereWithAggregatesInput = {
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Request"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Request"> | Date | string
   completedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Request"> | Date | string | null
+  pendingCompletionAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Request"> | Date | string | null
 }
 
 export type RequestCreateInput = {
@@ -355,6 +367,7 @@ export type RequestCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageCreateNestedManyWithoutRequestInput
   dream: Prisma.DreamCreateNestedOneWithoutRequestsInput
   dreamer: Prisma.ProfileCreateNestedOneWithoutRequestsAsDreamerInput
@@ -373,6 +386,7 @@ export type RequestUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedCreateNestedManyWithoutRequestInput
 }
 
@@ -385,6 +399,7 @@ export type RequestUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUpdateManyWithoutRequestNestedInput
   dream?: Prisma.DreamUpdateOneRequiredWithoutRequestsNestedInput
   dreamer?: Prisma.ProfileUpdateOneRequiredWithoutRequestsAsDreamerNestedInput
@@ -403,6 +418,7 @@ export type RequestUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedUpdateManyWithoutRequestNestedInput
 }
 
@@ -418,6 +434,7 @@ export type RequestCreateManyInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
 }
 
 export type RequestUpdateManyMutationInput = {
@@ -429,6 +446,7 @@ export type RequestUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type RequestUncheckedUpdateManyInput = {
@@ -443,6 +461,7 @@ export type RequestUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type RequestListRelationFilter = {
@@ -478,6 +497,7 @@ export type RequestCountOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  pendingCompletionAt?: Prisma.SortOrder
 }
 
 export type RequestAvgOrderByAggregateInput = {
@@ -496,6 +516,7 @@ export type RequestMaxOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  pendingCompletionAt?: Prisma.SortOrder
 }
 
 export type RequestMinOrderByAggregateInput = {
@@ -510,6 +531,7 @@ export type RequestMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   completedAt?: Prisma.SortOrder
+  pendingCompletionAt?: Prisma.SortOrder
 }
 
 export type RequestSumOrderByAggregateInput = {
@@ -677,6 +699,7 @@ export type RequestCreateWithoutDreamerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageCreateNestedManyWithoutRequestInput
   dream: Prisma.DreamCreateNestedOneWithoutRequestsInput
   interpreter?: Prisma.ProfileCreateNestedOneWithoutRequestsAsInterpreterInput
@@ -693,6 +716,7 @@ export type RequestUncheckedCreateWithoutDreamerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedCreateNestedManyWithoutRequestInput
 }
 
@@ -715,6 +739,7 @@ export type RequestCreateWithoutInterpreterInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageCreateNestedManyWithoutRequestInput
   dream: Prisma.DreamCreateNestedOneWithoutRequestsInput
   dreamer: Prisma.ProfileCreateNestedOneWithoutRequestsAsDreamerInput
@@ -731,6 +756,7 @@ export type RequestUncheckedCreateWithoutInterpreterInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedCreateNestedManyWithoutRequestInput
 }
 
@@ -775,6 +801,7 @@ export type RequestScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Request"> | Date | string
   completedAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
+  pendingCompletionAt?: Prisma.DateTimeNullableFilter<"Request"> | Date | string | null
 }
 
 export type RequestUpsertWithWhereUniqueWithoutInterpreterInput = {
@@ -802,6 +829,7 @@ export type RequestCreateWithoutDreamInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageCreateNestedManyWithoutRequestInput
   dreamer: Prisma.ProfileCreateNestedOneWithoutRequestsAsDreamerInput
   interpreter?: Prisma.ProfileCreateNestedOneWithoutRequestsAsInterpreterInput
@@ -818,6 +846,7 @@ export type RequestUncheckedCreateWithoutDreamInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedCreateNestedManyWithoutRequestInput
 }
 
@@ -856,6 +885,7 @@ export type RequestCreateWithoutChatMessagesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
   dream: Prisma.DreamCreateNestedOneWithoutRequestsInput
   dreamer: Prisma.ProfileCreateNestedOneWithoutRequestsAsDreamerInput
   interpreter?: Prisma.ProfileCreateNestedOneWithoutRequestsAsInterpreterInput
@@ -873,6 +903,7 @@ export type RequestUncheckedCreateWithoutChatMessagesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
 }
 
 export type RequestCreateOrConnectWithoutChatMessagesInput = {
@@ -900,6 +931,7 @@ export type RequestUpdateWithoutChatMessagesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   dream?: Prisma.DreamUpdateOneRequiredWithoutRequestsNestedInput
   dreamer?: Prisma.ProfileUpdateOneRequiredWithoutRequestsAsDreamerNestedInput
   interpreter?: Prisma.ProfileUpdateOneWithoutRequestsAsInterpreterNestedInput
@@ -917,6 +949,7 @@ export type RequestUncheckedUpdateWithoutChatMessagesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type RequestCreateManyDreamerInput = {
@@ -930,6 +963,7 @@ export type RequestCreateManyDreamerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
 }
 
 export type RequestCreateManyInterpreterInput = {
@@ -943,6 +977,7 @@ export type RequestCreateManyInterpreterInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
 }
 
 export type RequestUpdateWithoutDreamerInput = {
@@ -954,6 +989,7 @@ export type RequestUpdateWithoutDreamerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUpdateManyWithoutRequestNestedInput
   dream?: Prisma.DreamUpdateOneRequiredWithoutRequestsNestedInput
   interpreter?: Prisma.ProfileUpdateOneWithoutRequestsAsInterpreterNestedInput
@@ -970,6 +1006,7 @@ export type RequestUncheckedUpdateWithoutDreamerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedUpdateManyWithoutRequestNestedInput
 }
 
@@ -984,6 +1021,7 @@ export type RequestUncheckedUpdateManyWithoutDreamerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type RequestUpdateWithoutInterpreterInput = {
@@ -995,6 +1033,7 @@ export type RequestUpdateWithoutInterpreterInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUpdateManyWithoutRequestNestedInput
   dream?: Prisma.DreamUpdateOneRequiredWithoutRequestsNestedInput
   dreamer?: Prisma.ProfileUpdateOneRequiredWithoutRequestsAsDreamerNestedInput
@@ -1011,6 +1050,7 @@ export type RequestUncheckedUpdateWithoutInterpreterInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedUpdateManyWithoutRequestNestedInput
 }
 
@@ -1025,6 +1065,7 @@ export type RequestUncheckedUpdateManyWithoutInterpreterInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type RequestCreateManyDreamInput = {
@@ -1038,6 +1079,7 @@ export type RequestCreateManyDreamInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   completedAt?: Date | string | null
+  pendingCompletionAt?: Date | string | null
 }
 
 export type RequestUpdateWithoutDreamInput = {
@@ -1049,6 +1091,7 @@ export type RequestUpdateWithoutDreamInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUpdateManyWithoutRequestNestedInput
   dreamer?: Prisma.ProfileUpdateOneRequiredWithoutRequestsAsDreamerNestedInput
   interpreter?: Prisma.ProfileUpdateOneWithoutRequestsAsInterpreterNestedInput
@@ -1065,6 +1108,7 @@ export type RequestUncheckedUpdateWithoutDreamInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   chatMessages?: Prisma.ChatMessageUncheckedUpdateManyWithoutRequestNestedInput
 }
 
@@ -1079,6 +1123,7 @@ export type RequestUncheckedUpdateManyWithoutDreamInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pendingCompletionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 
@@ -1124,6 +1169,7 @@ export type RequestSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
+  pendingCompletionAt?: boolean
   chatMessages?: boolean | Prisma.Request$chatMessagesArgs<ExtArgs>
   dream?: boolean | Prisma.DreamDefaultArgs<ExtArgs>
   dreamer?: boolean | Prisma.ProfileDefaultArgs<ExtArgs>
@@ -1145,9 +1191,10 @@ export type RequestSelectScalar = {
   createdAt?: boolean
   updatedAt?: boolean
   completedAt?: boolean
+  pendingCompletionAt?: boolean
 }
 
-export type RequestOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dreamId" | "dreamerId" | "interpreterId" | "status" | "title" | "description" | "budget" | "createdAt" | "updatedAt" | "completedAt", ExtArgs["result"]["request"]>
+export type RequestOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dreamId" | "dreamerId" | "interpreterId" | "status" | "title" | "description" | "budget" | "createdAt" | "updatedAt" | "completedAt" | "pendingCompletionAt", ExtArgs["result"]["request"]>
 export type RequestInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   chatMessages?: boolean | Prisma.Request$chatMessagesArgs<ExtArgs>
   dream?: boolean | Prisma.DreamDefaultArgs<ExtArgs>
@@ -1176,6 +1223,7 @@ export type $RequestPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     createdAt: Date
     updatedAt: Date
     completedAt: Date | null
+    pendingCompletionAt: Date | null
   }, ExtArgs["result"]["request"]>
   composites: {}
 }
@@ -1560,6 +1608,7 @@ export interface RequestFieldRefs {
   readonly createdAt: Prisma.FieldRef<"Request", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Request", 'DateTime'>
   readonly completedAt: Prisma.FieldRef<"Request", 'DateTime'>
+  readonly pendingCompletionAt: Prisma.FieldRef<"Request", 'DateTime'>
 }
     
 

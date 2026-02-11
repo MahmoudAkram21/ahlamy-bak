@@ -64,7 +64,10 @@ export const ModelName = {
   Request: 'Request',
   InterpreterRating: 'InterpreterRating',
   AdminLog: 'AdminLog',
-  PageContent: 'PageContent'
+  PageContent: 'PageContent',
+  AppSetting: 'AppSetting',
+  Notification: 'Notification',
+  NotificationPreference: 'NotificationPreference'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -155,6 +158,7 @@ export const CommentScalarFieldEnum = {
   dreamId: 'dreamId',
   userId: 'userId',
   content: 'content',
+  isApproved: 'isApproved',
   createdAt: 'createdAt'
 } as const
 
@@ -251,7 +255,8 @@ export const RequestScalarFieldEnum = {
   budget: 'budget',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  completedAt: 'completedAt'
+  completedAt: 'completedAt',
+  pendingCompletionAt: 'pendingCompletionAt'
 } as const
 
 export type RequestScalarFieldEnum = (typeof RequestScalarFieldEnum)[keyof typeof RequestScalarFieldEnum]
@@ -294,6 +299,43 @@ export const PageContentScalarFieldEnum = {
 } as const
 
 export type PageContentScalarFieldEnum = (typeof PageContentScalarFieldEnum)[keyof typeof PageContentScalarFieldEnum]
+
+
+export const AppSettingScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  value: 'value',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AppSettingScalarFieldEnum = (typeof AppSettingScalarFieldEnum)[keyof typeof AppSettingScalarFieldEnum]
+
+
+export const NotificationScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  title: 'title',
+  message: 'message',
+  isRead: 'isRead',
+  createdAt: 'createdAt',
+  recipientId: 'recipientId',
+  entityId: 'entityId',
+  entityType: 'entityType'
+} as const
+
+export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const NotificationPreferenceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  emailOnLike: 'emailOnLike',
+  emailOnFollow: 'emailOnFollow',
+  inAppOnLike: 'inAppOnLike'
+} as const
+
+export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferenceScalarFieldEnum)[keyof typeof NotificationPreferenceScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -497,4 +539,33 @@ export const PageContentOrderByRelevanceFieldEnum = {
 } as const
 
 export type PageContentOrderByRelevanceFieldEnum = (typeof PageContentOrderByRelevanceFieldEnum)[keyof typeof PageContentOrderByRelevanceFieldEnum]
+
+
+export const AppSettingOrderByRelevanceFieldEnum = {
+  id: 'id',
+  key: 'key',
+  value: 'value'
+} as const
+
+export type AppSettingOrderByRelevanceFieldEnum = (typeof AppSettingOrderByRelevanceFieldEnum)[keyof typeof AppSettingOrderByRelevanceFieldEnum]
+
+
+export const NotificationOrderByRelevanceFieldEnum = {
+  id: 'id',
+  title: 'title',
+  message: 'message',
+  recipientId: 'recipientId',
+  entityId: 'entityId',
+  entityType: 'entityType'
+} as const
+
+export type NotificationOrderByRelevanceFieldEnum = (typeof NotificationOrderByRelevanceFieldEnum)[keyof typeof NotificationOrderByRelevanceFieldEnum]
+
+
+export const NotificationPreferenceOrderByRelevanceFieldEnum = {
+  id: 'id',
+  userId: 'userId'
+} as const
+
+export type NotificationPreferenceOrderByRelevanceFieldEnum = (typeof NotificationPreferenceOrderByRelevanceFieldEnum)[keyof typeof NotificationPreferenceOrderByRelevanceFieldEnum]
 

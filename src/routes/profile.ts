@@ -5,6 +5,7 @@ import { clearSessionCookie } from '../utils/session';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { buildProfileVisionStatsPdf } from '../utils/pdf-vision-stats';
 
 const router = Router();
 
@@ -190,6 +191,19 @@ router.get('/interpretation-stats-by-type/export', requireAuth, async (req, res)
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.txt"`);
       return res.send(Buffer.from(body, 'utf-8'));
+    }
+    if (format === 'pdf') {
+      const dateRange = `${start.toISOString().slice(0, 10)} - ${end.toISOString().slice(0, 10)}`;
+      const pdfBuffer = await buildProfileVisionStatsPdf({
+        interpreterName: profile.fullName || profile.email,
+        monthLabel: month || 'current',
+        dateRange,
+        counts,
+        total,
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.pdf"`);
+      return res.send(pdfBuffer);
     }
     res.setHeader('Content-Disposition', `attachment; filename="vision-stats-${month || 'current'}.json"`);
     return res.json({ month: month || 'current', start, end, counts, total, labels });

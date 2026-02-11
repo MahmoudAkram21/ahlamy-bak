@@ -22,7 +22,7 @@ import paymentsRoutes from "./routes/payments";
 import adminRouter from "./routes/admin";
 import adminPagesRouter from "./routes/admin-pages";
 import pagesRouter from "./routes/pages";
-
+import appAettings from "./routes/appSettings"
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
 
 const app = express();
@@ -93,6 +93,7 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRouter);
 app.use("/api/admin/pages", adminPagesRouter);
 app.use("/api/pages", pagesRouter);
+app.use("/api/app-settings", appAettings);
 
 // 404 handler
 app.use((_req, res) => {

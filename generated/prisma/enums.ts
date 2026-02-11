@@ -19,6 +19,16 @@ export const MessageType = {
 export type MessageType = (typeof MessageType)[keyof typeof MessageType]
 
 
+export const NotificationType = {
+  LIKE: 'LIKE',
+  COMMENT: 'COMMENT',
+  FOLLOW: 'FOLLOW',
+  SYSTEM: 'SYSTEM'
+} as const
+
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
+
+
 export const Role = {
   dreamer: 'dreamer',
   interpreter: 'interpreter',

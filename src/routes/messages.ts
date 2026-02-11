@@ -157,6 +157,43 @@ router.post('/', requireAuth, async (req, res) => {
       },
     });
 
+    // If dreamer replied "نعم" to the verification question, complete the request and dream (close chat)
+    const contentTrimmed = (content || '').trim();
+    if (
+      contentTrimmed === 'نعم' &&
+      dream.dreamerId === userId &&
+      dream.interpreterId
+    ) {
+      const requestRow = await prisma.request.findFirst({
+        where: {
+          dreamId: dream_id,
+          interpreterId: dream.interpreterId,
+        },
+        select: { id: true, pendingCompletionAt: true, status: true },
+      });
+      if (
+        requestRow &&
+        requestRow.pendingCompletionAt &&
+        requestRow.status !== 'completed'
+      ) {
+        const now = new Date();
+        await prisma.$transaction([
+          prisma.request.update({
+            where: { id: requestRow.id },
+            data: {
+              status: 'completed',
+              completedAt: now,
+              pendingCompletionAt: null,
+            },
+          }),
+          prisma.dream.update({
+            where: { id: dream_id },
+            data: { status: 'interpreted' },
+          }),
+        ]);
+      }
+    }
+
     // Return anonymous message
     const anonymousMessage = {
       ...message,
@@ -179,6 +216,69 @@ router.post('/', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Messages] Create error:', error);
     return res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+const MESSAGE_EDIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
+router.patch('/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const { content } = req.body ?? {};
+
+    if (!content || typeof content !== 'string' || !content.trim()) {
+      return res.status(400).json({ error: 'content is required' });
+    }
+
+    const message = await prisma.message.findUnique({
+      where: { id },
+      include: {
+        sender: { select: { id: true, role: true } },
+      },
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    if (message.senderId !== userId) {
+      return res.status(403).json({ error: 'Only the sender can edit this message' });
+    }
+
+    const createdAt = new Date(message.createdAt).getTime();
+    if (Date.now() - createdAt > MESSAGE_EDIT_WINDOW_MS) {
+      return res.status(400).json({
+        error: 'Message can only be edited within 10 minutes of sending',
+      });
+    }
+
+    const updated = await prisma.message.update({
+      where: { id },
+      data: { content: content.trim() },
+      include: {
+        sender: { select: { id: true, role: true } },
+      },
+    });
+
+    const anonymousMessage = {
+      ...updated,
+      sender: {
+        id: updated.sender.id,
+        role: updated.sender.role,
+        displayName: updated.sender.role === 'dreamer' ? 'الرائي' : 'المفسر',
+      },
+    };
+
+    const io = req.app.get('io');
+    if (io && updated.dreamId) {
+      io.to(`dream:${updated.dreamId}`).emit('message:updated', anonymousMessage);
+    }
+
+    return res.json(anonymousMessage);
+  } catch (error) {
+    console.error('[Messages] Update error:', error);
+    return res.status(500).json({ error: 'Failed to update message' });
   }
 });
 

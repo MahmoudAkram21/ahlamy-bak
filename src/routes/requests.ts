@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
+import { createNotification } from '../utils/notifications';
+import { applyPendingCompletionIfDue } from '../utils/requestCompletion';
 
 const router = Router();
 
@@ -15,7 +17,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-    const requests = await prisma.request.findMany({
+    let requests = await prisma.request.findMany({
       where: isAdmin
         ? {}
         : {
@@ -49,6 +51,48 @@ router.get('/', requireAuth, async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Apply 10-minute auto-completion for any request whose deadline passed
+    let appliedAny = false;
+    for (const r of requests) {
+      if (await applyPendingCompletionIfDue(prisma, r.id)) appliedAny = true;
+    }
+    if (appliedAny) {
+      requests = await prisma.request.findMany({
+        where: isAdmin
+          ? {}
+          : {
+              OR: [{ dreamerId: userId }, { interpreterId: userId }],
+            },
+        include: {
+          dream: {
+            select: {
+              id: true,
+              title: true,
+              content: true,
+              status: true,
+            },
+          },
+          dreamer: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          interpreter: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     return res.json(requests);
   } catch (error) {
@@ -266,6 +310,30 @@ router.patch('/:id', requireAuth, async (req, res) => {
         },
       },
     });
+
+    // Notify dreamer when an interpreter is assigned to their request
+    if (interpreterId && existingRequest.dreamerId) {
+      await createNotification(prisma, {
+        recipientId: existingRequest.dreamerId,
+        type: 'SYSTEM',
+        title: 'تم تعيين مفسر',
+        message: 'تم تعيين مفسر لطلب تفسير رؤيتك. يمكنك متابعة المحادثة من صفحة الطلبات.',
+        entityId: id,
+        entityType: 'REQUEST',
+      });
+    }
+
+    // Notify dreamer when the request is marked completed
+    if (status === 'completed' && existingRequest.dreamerId) {
+      await createNotification(prisma, {
+        recipientId: existingRequest.dreamerId,
+        type: 'SYSTEM',
+        title: 'تم إكمال التفسير',
+        message: 'تم إكمال تفسير رؤيتك. يمكنك مراجعة النتيجة من لوحة التحكم.',
+        entityId: id,
+        entityType: 'REQUEST',
+      });
+    }
 
     return res.json(updatedRequest);
   } catch (error) {

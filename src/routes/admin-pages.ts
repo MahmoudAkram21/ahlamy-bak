@@ -144,6 +144,38 @@ router.post('/seed', requireAuth, async (req, res) => {
                 content: '<h1>باقات أحلامي</h1><p>اختر الباقة المناسبة لك للحصول على تفسير رؤاك من معبّرين معتمدين.</p>',
                 metadata: { seoDescription: 'باقات وتذاكر التفسير' },
             },
+            {
+                pageKey: 'quran',
+                title: 'القرآن الكريم',
+                content: `<div class="space-y-6 text-right">
+  <div class="rounded-2xl bg-sky-50/70 p-5">
+    <h2 class="text-lg font-bold text-slate-900">قراءة يومية مقترحة</h2>
+    <p class="mt-2 text-sm text-slate-600">خصص 15 دقيقة يومياً لتلاوة ما تيسر من القرآن، وابدأ بسورة قصيرة مع التأمل في المعاني.</p>
+  </div>
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة الكهف</h3>
+      <p class="mt-2 text-sm text-slate-600">اقرأها كل جمعة لنور ما بين الجمعتين.</p>
+      <a href="https://quran.com/18" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة يس</h3>
+      <p class="mt-2 text-sm text-slate-600">تسعد القلوب وتذكر بالبعث والآخرة.</p>
+      <a href="https://quran.com/36" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة الملك</h3>
+      <p class="mt-2 text-sm text-slate-600">من قرأها كل ليلة وُقي من عذاب القبر.</p>
+      <a href="https://quran.com/67" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+  </div>
+  <div class="rounded-2xl border border-amber-100 bg-amber-50/70 p-5">
+    <h3 class="text-base font-semibold text-slate-900">استمع لأجمل التلاوات</h3>
+    <p class="mt-2 text-sm text-slate-600">يمكنك الاستماع إلى تلاوات الشيخ ماهر المعيقلي، سعد الغامدي، ومشاري العفاسي عبر <a href="https://quranicaudio.com" class="font-semibold text-sky-600 underline" target="_blank" rel="noopener noreferrer">QuranicAudio.com</a>.</p>
+  </div>
+</div>`,
+                metadata: { seoDescription: 'القرآن الكريم - اقرأ واستمع لتلاوات مختارة' },
+            },
         ];
 
         const created = [];

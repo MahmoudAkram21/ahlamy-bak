@@ -201,6 +201,95 @@ async function main() {
     },
   });
 
+  console.log("👤 Creating test page content...");
+
+  const pageContent = [
+    {
+      pageKey: "terms",
+      title: "الشروط والأحكام",
+      content: "<h1>الشروط والأحكام</h1><p>يرجى قراءة هذه الشروط بعناية قبل استخدام المنصة.</p>",
+      metadata: { seoDescription: "شروط وأحكام استخدام منصة مبشرات" },
+      isPublished: true,
+    },
+    {
+      pageKey: "support",
+      title: "الدعم والمساعدة",
+      content: "<p>للتواصل معنا وطلب المساعدة.</p>",
+      metadata: { seoDescription: "شروط وأحكام استخدام منصة مبشرات" },
+      isPublished: true,
+    },
+    {
+      pageKey: "quran",
+      title: "القرآن الكريم",
+      content: `<div class="space-y-6 text-right">
+  <div class="rounded-2xl bg-sky-50/70 p-5">
+    <h2 class="text-lg font-bold text-slate-900">قراءة يومية مقترحة</h2>
+    <p class="mt-2 text-sm text-slate-600">خصص 15 دقيقة يومياً لتلاوة ما تيسر من القرآن، وابدأ بسورة قصيرة مع التأمل في المعاني.</p>
+  </div>
+  <div class="grid gap-4 md:grid-cols-3">
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة الكهف</h3>
+      <p class="mt-2 text-sm text-slate-600">اقرأها كل جمعة لنور ما بين الجمعتين.</p>
+      <a href="https://quran.com/18" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة يس</h3>
+      <p class="mt-2 text-sm text-slate-600">تسعد القلوب وتذكر بالبعث والآخرة.</p>
+      <a href="https://quran.com/36" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+    <div class="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+      <h3 class="text-base font-semibold text-slate-900">سورة الملك</h3>
+      <p class="mt-2 text-sm text-slate-600">من قرأها كل ليلة وُقي من عذاب القبر.</p>
+      <a href="https://quran.com/67" target="_blank" rel="noopener noreferrer" class="mt-4 inline-flex items-center text-sm font-semibold text-sky-600 underline">اقرأ الآن</a>
+    </div>
+  </div>
+  <div class="rounded-2xl border border-amber-100 bg-amber-50/70 p-5">
+    <h3 class="text-base font-semibold text-slate-900">استمع لأجمل التلاوات</h3>
+    <p class="mt-2 text-sm text-slate-600">يمكنك الاستماع إلى تلاوات الشيخ ماهر المعيقلي، سعد الغامدي، ومشاري العفاسي عبر <a href="https://quranicaudio.com" class="font-semibold text-sky-600 underline" target="_blank" rel="noopener noreferrer">QuranicAudio.com</a>.</p>
+  </div>
+</div>`,
+      metadata: { seoDescription: "القرآن الكريم - اقرأ واستمع لتلاوات مختارة" },
+      isPublished: true,
+    },
+  ];
+
+  await prisma.pageContent.createMany({
+    data: pageContent,
+    skipDuplicates: true,
+  });
+
+  console.log(`✅ Created page content: ${pageContent.length}`);
+
+
+  const settings = [
+    {
+      key: "emailSupport",
+      value: "support@mubasharat.com",
+    },
+    {
+      key: "phone",
+      value: "+201234567890"
+    }
+    ,{
+      key: "whastapp",
+      value: "+201234567890"
+    }
+    ,{
+      key: "googlePlayLink",
+      value: "https://play.google.com/store/apps/details?id=com.mubasharat.app"
+    }
+    ,{
+      key: "appStoreLink",
+      value: "https://apps.apple.com/us/app/mubasharat/id1234567890"
+    }
+  ]
+
+  await prisma.appSetting.createMany({
+    data: settings, 
+    skipDuplicates: true,
+  });
+
+  // Create test page content
   console.log(`✅ Created dreamer: ${dreamerEmail}`);
   console.log(`   Password: dreamer123`);
 

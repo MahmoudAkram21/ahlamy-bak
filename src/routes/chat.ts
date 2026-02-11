@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
+import { createNotification } from '../utils/notifications';
 
 const router = Router();
 
@@ -80,6 +81,7 @@ router.post('/', requireAuth, async (req, res) => {
       select: {
         dreamerId: true,
         interpreterId: true,
+        pendingCompletionAt: true,
       },
     });
 
@@ -125,6 +127,29 @@ router.post('/', requireAuth, async (req, res) => {
         },
       },
     });
+
+    // If dreamer replies, cancel the 10-minute auto-completion (interpreter had requested completion)
+    if (request.pendingCompletionAt && request.dreamerId === userId) {
+      await prisma.request.update({
+        where: { id: request_id },
+        data: { pendingCompletionAt: null },
+      });
+    }
+
+    // Notify the other participant (dreamer or interpreter)
+    const recipientId =
+      userId === request.dreamerId ? request.interpreterId : request.dreamerId;
+    const senderName = message.sender?.fullName || 'شخص';
+    if (recipientId) {
+      await createNotification(prisma, {
+        recipientId,
+        type: 'COMMENT',
+        title: 'رسالة جديدة',
+        message: `لديك رسالة جديدة من ${senderName} في محادثة تفسير الرؤية.`,
+        entityId: request_id,
+        entityType: 'REQUEST',
+      });
+    }
 
     return res.json(message);
   } catch (error) {

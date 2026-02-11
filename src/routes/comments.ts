@@ -7,6 +7,25 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const dreamId = req.query.dream_id as string | undefined;
+    const approvedOnly = req.query.approved === 'true';
+
+    // Public: get approved comments only (e.g. for homepage "اراء عملاء احلامي")
+    if (approvedOnly) {
+      const comments = await prisma.comment.findMany({
+        where: { isApproved: true },
+        include: {
+          user: {
+            select: {
+              id: true,
+              fullName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+      return res.json(comments);
+    }
 
     if (!dreamId) {
       return res.status(400).json({ error: 'dream_id is required' });

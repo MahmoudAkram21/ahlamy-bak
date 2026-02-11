@@ -29,6 +29,7 @@ export type CommentMinAggregateOutputType = {
   dreamId: string | null
   userId: string | null
   content: string | null
+  isApproved: boolean | null
   createdAt: Date | null
 }
 
@@ -37,6 +38,7 @@ export type CommentMaxAggregateOutputType = {
   dreamId: string | null
   userId: string | null
   content: string | null
+  isApproved: boolean | null
   createdAt: Date | null
 }
 
@@ -45,6 +47,7 @@ export type CommentCountAggregateOutputType = {
   dreamId: number
   userId: number
   content: number
+  isApproved: number
   createdAt: number
   _all: number
 }
@@ -55,6 +58,7 @@ export type CommentMinAggregateInputType = {
   dreamId?: true
   userId?: true
   content?: true
+  isApproved?: true
   createdAt?: true
 }
 
@@ -63,6 +67,7 @@ export type CommentMaxAggregateInputType = {
   dreamId?: true
   userId?: true
   content?: true
+  isApproved?: true
   createdAt?: true
 }
 
@@ -71,6 +76,7 @@ export type CommentCountAggregateInputType = {
   dreamId?: true
   userId?: true
   content?: true
+  isApproved?: true
   createdAt?: true
   _all?: true
 }
@@ -152,6 +158,7 @@ export type CommentGroupByOutputType = {
   dreamId: string
   userId: string
   content: string
+  isApproved: boolean
   createdAt: Date
   _count: CommentCountAggregateOutputType | null
   _min: CommentMinAggregateOutputType | null
@@ -181,6 +188,7 @@ export type CommentWhereInput = {
   dreamId?: Prisma.StringFilter<"Comment"> | string
   userId?: Prisma.StringFilter<"Comment"> | string
   content?: Prisma.StringFilter<"Comment"> | string
+  isApproved?: Prisma.BoolFilter<"Comment"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Comment"> | Date | string
   dream?: Prisma.XOR<Prisma.DreamScalarRelationFilter, Prisma.DreamWhereInput>
   user?: Prisma.XOR<Prisma.ProfileScalarRelationFilter, Prisma.ProfileWhereInput>
@@ -191,6 +199,7 @@ export type CommentOrderByWithRelationInput = {
   dreamId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   content?: Prisma.SortOrder
+  isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   dream?: Prisma.DreamOrderByWithRelationInput
   user?: Prisma.ProfileOrderByWithRelationInput
@@ -205,6 +214,7 @@ export type CommentWhereUniqueInput = Prisma.AtLeast<{
   dreamId?: Prisma.StringFilter<"Comment"> | string
   userId?: Prisma.StringFilter<"Comment"> | string
   content?: Prisma.StringFilter<"Comment"> | string
+  isApproved?: Prisma.BoolFilter<"Comment"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Comment"> | Date | string
   dream?: Prisma.XOR<Prisma.DreamScalarRelationFilter, Prisma.DreamWhereInput>
   user?: Prisma.XOR<Prisma.ProfileScalarRelationFilter, Prisma.ProfileWhereInput>
@@ -215,6 +225,7 @@ export type CommentOrderByWithAggregationInput = {
   dreamId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   content?: Prisma.SortOrder
+  isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.CommentCountOrderByAggregateInput
   _max?: Prisma.CommentMaxOrderByAggregateInput
@@ -229,12 +240,14 @@ export type CommentScalarWhereWithAggregatesInput = {
   dreamId?: Prisma.StringWithAggregatesFilter<"Comment"> | string
   userId?: Prisma.StringWithAggregatesFilter<"Comment"> | string
   content?: Prisma.StringWithAggregatesFilter<"Comment"> | string
+  isApproved?: Prisma.BoolWithAggregatesFilter<"Comment"> | boolean
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Comment"> | Date | string
 }
 
 export type CommentCreateInput = {
   id?: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
   dream: Prisma.DreamCreateNestedOneWithoutCommentsInput
   user: Prisma.ProfileCreateNestedOneWithoutCommentsInput
@@ -245,12 +258,14 @@ export type CommentUncheckedCreateInput = {
   dreamId: string
   userId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
 export type CommentUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dream?: Prisma.DreamUpdateOneRequiredWithoutCommentsNestedInput
   user?: Prisma.ProfileUpdateOneRequiredWithoutCommentsNestedInput
@@ -261,6 +276,7 @@ export type CommentUncheckedUpdateInput = {
   dreamId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -269,12 +285,14 @@ export type CommentCreateManyInput = {
   dreamId: string
   userId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
 export type CommentUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -283,6 +301,7 @@ export type CommentUncheckedUpdateManyInput = {
   dreamId?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -307,6 +326,7 @@ export type CommentCountOrderByAggregateInput = {
   dreamId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   content?: Prisma.SortOrder
+  isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -315,6 +335,7 @@ export type CommentMaxOrderByAggregateInput = {
   dreamId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   content?: Prisma.SortOrder
+  isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -323,6 +344,7 @@ export type CommentMinOrderByAggregateInput = {
   dreamId?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   content?: Prisma.SortOrder
+  isApproved?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -413,6 +435,7 @@ export type CommentUncheckedUpdateManyWithoutDreamNestedInput = {
 export type CommentCreateWithoutUserInput = {
   id?: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
   dream: Prisma.DreamCreateNestedOneWithoutCommentsInput
 }
@@ -421,6 +444,7 @@ export type CommentUncheckedCreateWithoutUserInput = {
   id?: string
   dreamId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
@@ -458,12 +482,14 @@ export type CommentScalarWhereInput = {
   dreamId?: Prisma.StringFilter<"Comment"> | string
   userId?: Prisma.StringFilter<"Comment"> | string
   content?: Prisma.StringFilter<"Comment"> | string
+  isApproved?: Prisma.BoolFilter<"Comment"> | boolean
   createdAt?: Prisma.DateTimeFilter<"Comment"> | Date | string
 }
 
 export type CommentCreateWithoutDreamInput = {
   id?: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
   user: Prisma.ProfileCreateNestedOneWithoutCommentsInput
 }
@@ -472,6 +498,7 @@ export type CommentUncheckedCreateWithoutDreamInput = {
   id?: string
   userId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
@@ -505,12 +532,14 @@ export type CommentCreateManyUserInput = {
   id?: string
   dreamId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
 export type CommentUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dream?: Prisma.DreamUpdateOneRequiredWithoutCommentsNestedInput
 }
@@ -519,6 +548,7 @@ export type CommentUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dreamId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -526,6 +556,7 @@ export type CommentUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dreamId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -533,12 +564,14 @@ export type CommentCreateManyDreamInput = {
   id?: string
   userId: string
   content: string
+  isApproved?: boolean
   createdAt?: Date | string
 }
 
 export type CommentUpdateWithoutDreamInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.ProfileUpdateOneRequiredWithoutCommentsNestedInput
 }
@@ -547,6 +580,7 @@ export type CommentUncheckedUpdateWithoutDreamInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -554,6 +588,7 @@ export type CommentUncheckedUpdateManyWithoutDreamInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
+  isApproved?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -564,6 +599,7 @@ export type CommentSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   dreamId?: boolean
   userId?: boolean
   content?: boolean
+  isApproved?: boolean
   createdAt?: boolean
   dream?: boolean | Prisma.DreamDefaultArgs<ExtArgs>
   user?: boolean | Prisma.ProfileDefaultArgs<ExtArgs>
@@ -576,10 +612,11 @@ export type CommentSelectScalar = {
   dreamId?: boolean
   userId?: boolean
   content?: boolean
+  isApproved?: boolean
   createdAt?: boolean
 }
 
-export type CommentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dreamId" | "userId" | "content" | "createdAt", ExtArgs["result"]["comment"]>
+export type CommentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "dreamId" | "userId" | "content" | "isApproved" | "createdAt", ExtArgs["result"]["comment"]>
 export type CommentInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   dream?: boolean | Prisma.DreamDefaultArgs<ExtArgs>
   user?: boolean | Prisma.ProfileDefaultArgs<ExtArgs>
@@ -596,6 +633,7 @@ export type $CommentPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     dreamId: string
     userId: string
     content: string
+    isApproved: boolean
     createdAt: Date
   }, ExtArgs["result"]["comment"]>
   composites: {}
@@ -972,6 +1010,7 @@ export interface CommentFieldRefs {
   readonly dreamId: Prisma.FieldRef<"Comment", 'String'>
   readonly userId: Prisma.FieldRef<"Comment", 'String'>
   readonly content: Prisma.FieldRef<"Comment", 'String'>
+  readonly isApproved: Prisma.FieldRef<"Comment", 'Boolean'>
   readonly createdAt: Prisma.FieldRef<"Comment", 'DateTime'>
 }
     
