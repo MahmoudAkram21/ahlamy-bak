@@ -296,7 +296,7 @@ router.patch('/users/:id', requireAuth, async (req, res) => {
       if (Number.isNaN(parsedRating) || parsedRating < 0) {
         return res.status(400).json({ error: 'rating must be a positive number' });
       }
-      updateData.rating = new Prisma.Decimal(parsedRating);
+      updateData.rating = parsedRating;
     }
 
     if (Object.keys(updateData).length === 0) {
