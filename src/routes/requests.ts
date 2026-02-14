@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
-import { createNotification } from '../utils/notifications';
-import { applyPendingCompletionIfDue } from '../utils/requestCompletion';
+import prisma from '../lib/prisma.js';
+import { requireAuth } from '../middleware/auth.js';
+import { createNotification } from '../utils/notifications.js';
+import { applyPendingCompletionIfDue } from '../utils/requestCompletion.js';
 
 const router = Router();
 

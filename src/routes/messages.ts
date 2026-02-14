@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
+import prisma from '../lib/prisma.js';
+import { requireAuth } from '../middleware/auth.js';
 import { writeFile } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';

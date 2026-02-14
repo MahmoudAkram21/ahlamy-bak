@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
+import prisma from '../lib/prisma.js';
+import { requireAuth } from '../middleware/auth.js';
 import { Prisma } from '@prisma/client';
-import { hashPassword } from '../utils/auth';
-import { buildAdminVisionStatsPdf } from '../utils/pdf-vision-stats';
+import { hashPassword } from '../utils/auth.js';
+import { buildAdminVisionStatsPdf } from '../utils/pdf-vision-stats.js';
 
 const router = Router();
 

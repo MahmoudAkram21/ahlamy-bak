@@ -7,22 +7,22 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
-import { verifyToken } from "./utils/auth";
+import { verifyToken } from "./utils/auth.js";
 
-import authRouter from "./routes/auth";
-import profileRouter from "./routes/profile";
-import dreamsRouter from "./routes/dreams";
-import messagesRouter from "./routes/messages";
-import commentsRouter from "./routes/comments";
-import requestsRouter from "./routes/requests";
-import chatRouter from "./routes/chat";
-import notificationsRouter from "./routes/notifications";
-import plansRouter from "./routes/plans";
-import paymentsRoutes from "./routes/payments";
-import adminRouter from "./routes/admin";
-import adminPagesRouter from "./routes/admin-pages";
-import pagesRouter from "./routes/pages";
-import appAettings from "./routes/appSettings"
+import authRouter from "./routes/auth.js";
+import profileRouter from "./routes/profile.js";
+import dreamsRouter from "./routes/dreams.js";
+import messagesRouter from "./routes/messages.js";
+import commentsRouter from "./routes/comments.js";
+import requestsRouter from "./routes/requests.js";
+import chatRouter from "./routes/chat.js";
+import notificationsRouter from "./routes/notifications.js";
+import plansRouter from "./routes/plans.js";
+import paymentsRoutes from "./routes/payments.js";
+import adminRouter from "./routes/admin.js";
+import adminPagesRouter from "./routes/admin-pages.js";
+import pagesRouter from "./routes/pages.js";
+import appAettings from "./routes/appSettings.js"
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
 
 const app = express();

@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { hashPassword, verifyPassword, generateToken } from '../utils/auth';
-import { setSessionCookie, clearSessionCookie } from '../utils/session';
-import { requireAuth } from '../middleware/auth';
+import prisma from '../lib/prisma.js';
+import { hashPassword, verifyPassword, generateToken } from '../utils/auth.js';
+import { setSessionCookie, clearSessionCookie } from '../utils/session.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 

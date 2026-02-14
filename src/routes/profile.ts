@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
-import { clearSessionCookie } from '../utils/session';
+import prisma from '../lib/prisma.js';
+import { requireAuth } from '../middleware/auth.js';
+import { clearSessionCookie } from '../utils/session.js';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { buildProfileVisionStatsPdf } from '../utils/pdf-vision-stats';
+import { buildProfileVisionStatsPdf } from '../utils/pdf-vision-stats.js';
 
 const router = Router();
 

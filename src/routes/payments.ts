@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth";
-import stripe from "../lib/stripe";
-import prisma from "../lib/prisma";
+import { requireAuth } from "../middleware/auth.js";
+import stripe from "../lib/stripe.js";
+import prisma from "../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 
 const router = Router();

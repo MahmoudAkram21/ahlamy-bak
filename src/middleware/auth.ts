@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/auth';
+import { verifyToken } from '../utils/auth.js';
 
 const SESSION_COOKIE_NAME = 'auth_token';
 
