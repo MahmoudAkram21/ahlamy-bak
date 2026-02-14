@@ -1,4 +1,4 @@
-import type { PrismaClient } from '../../generated/prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
 /**
  * If the request has pendingCompletionAt in the past and is not completed,

@@ -1,5 +1,5 @@
-import type { PrismaClient } from '../../generated/prisma/client';
-import type { NotificationType } from '../../generated/prisma/enums';
+import type { PrismaClient } from '@prisma/client';
+import type { NotificationType } from '@prisma/client';
 
 export interface CreateNotificationParams {
   recipientId: string;

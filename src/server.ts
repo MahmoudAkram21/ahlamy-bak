@@ -6,8 +6,12 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import path from "path";
+import { fileURLToPath } from "url";
 import fs from "fs";
 import { verifyToken } from "./utils/auth.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import authRouter from "./routes/auth.js";
 import profileRouter from "./routes/profile.js";
