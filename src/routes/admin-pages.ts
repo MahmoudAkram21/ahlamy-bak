@@ -103,6 +103,12 @@ router.post('/seed', requireAuth, async (req, res) => {
                 metadata: { seoDescription: 'شروط وأحكام استخدام منصة مبشرات' },
             },
             {
+                pageKey: 'privacy',
+                title: 'سياسة الخصوصية',
+                content: '<h1>سياسة الخصوصية</h1><p>نحن نحترم خصوصيتك. توضح هذه السياسة كيفية جمع واستخدام وحماية بياناتك الشخصية.</p>',
+                metadata: { seoDescription: 'سياسة الخصوصية - أحلامي' },
+            },
+            {
                 pageKey: 'guide',
                 title: 'دليل الاستخدام',
                 content: '<h1>دليل الاستخدام</h1><p>كيفية استخدام منصة مبشرات خطوة بخطوة.</p>',

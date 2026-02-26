@@ -212,6 +212,13 @@ async function main() {
       isPublished: true,
     },
     {
+      pageKey: "privacy",
+      title: "سياسة الخصوصية",
+      content: "<h1>سياسة الخصوصية</h1><p>نحن نحترم خصوصيتك. توضح هذه السياسة كيفية جمع واستخدام وحماية بياناتك الشخصية.</p>",
+      metadata: { seoDescription: "سياسة الخصوصية - أحلامي" },
+      isPublished: true,
+    },
+    {
       pageKey: "support",
       title: "الدعم والمساعدة",
       content: "<p>للتواصل معنا وطلب المساعدة.</p>",
