@@ -1,4 +1,5 @@
 const productionAppBaseUrl = "https://ahlamy.nodeteam.site";
+const productionDashboardBaseUrl = "https://ahlamy-dashboard.vercel.app";
 const developmentAppBaseUrl = "http://localhost:3000";
 const developmentDashboardBaseUrl = "http://localhost:5173";
 
@@ -14,7 +15,7 @@ export const appBaseUrl = trimTrailingSlash(
 
 export const dashboardBaseUrl = trimTrailingSlash(
   process.env.DASHBOARD_BASE_URL ||
-    (isProduction ? productionAppBaseUrl : developmentDashboardBaseUrl),
+    (isProduction ? productionDashboardBaseUrl : developmentDashboardBaseUrl),
 );
 
 export function getDefaultCorsOrigins() {
