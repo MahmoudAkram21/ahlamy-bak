@@ -10,12 +10,24 @@ const router = Router();
 
 router.patch('/update', requireAuth, async (req, res) => {
   try {
-    const { fullName, bio, avatarUrl } = req.body ?? {};
+    const { fullName, bio, avatarUrl, city, countryCode } = req.body ?? {};
     const updateData: Record<string, unknown> = {};
 
     if (fullName !== undefined) updateData.fullName = fullName;
     if (bio !== undefined) updateData.bio = bio;
     if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+    if (city !== undefined) {
+      if (typeof city !== 'string' || !city.trim()) {
+        return res.status(400).json({ error: 'city must be a non-empty string' });
+      }
+      updateData.city = city.trim();
+    }
+    if (countryCode !== undefined) {
+      if (typeof countryCode !== 'string' || !/^[A-Za-z]{2}$/.test(countryCode.trim())) {
+        return res.status(400).json({ error: 'countryCode must be a valid ISO-2 country code' });
+      }
+      updateData.countryCode = countryCode.trim().toUpperCase();
+    }
 
     const updatedProfile = await prisma.profile.update({
       where: { id: req.user!.userId },
@@ -30,6 +42,8 @@ router.patch('/update', requireAuth, async (req, res) => {
         role: updatedProfile.role,
         avatarUrl: updatedProfile.avatarUrl,
         bio: updatedProfile.bio,
+        city: updatedProfile.city,
+        countryCode: updatedProfile.countryCode,
         isAvailable: updatedProfile.isAvailable,
         totalInterpretations: updatedProfile.totalInterpretations,
         rating: updatedProfile.rating.toString(),

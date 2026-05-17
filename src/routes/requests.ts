@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
+import { createNotification } from '../utils/notifications';
 
 const router = Router();
 
@@ -166,6 +167,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       select: {
         dreamerId: true,
         interpreterId: true,
+        status: true,
       },
     });
 
@@ -230,6 +232,42 @@ router.patch('/:id', requireAuth, async (req, res) => {
         },
       },
     });
+
+    if (interpreterId && interpreterId !== existingRequest.interpreterId) {
+      Promise.all([
+        createNotification(
+          existingRequest.dreamerId,
+          'request_assigned',
+          'Your dream has been assigned to an interpreter',
+          id
+        ),
+        createNotification(
+          interpreterId,
+          'request_assigned',
+          'A new dream has been assigned to you',
+          id
+        ),
+      ]).catch((error) => console.error('[Notifications] Request assignment trigger error:', error));
+    }
+
+    if (status && status !== existingRequest.status) {
+      const recipientIds = [existingRequest.dreamerId, existingRequest.interpreterId].filter(
+        (recipientId): recipientId is string => Boolean(recipientId && recipientId !== requesterId)
+      );
+
+      if (recipientIds.length > 0) {
+        Promise.all(
+          recipientIds.map((recipientId) =>
+            createNotification(
+              recipientId,
+              'request_status_changed',
+              `Dream request status changed to ${status}`,
+              id
+            )
+          )
+        ).catch((error) => console.error('[Notifications] Request status trigger error:', error));
+      }
+    }
 
     return res.json(updatedRequest);
   } catch (error) {

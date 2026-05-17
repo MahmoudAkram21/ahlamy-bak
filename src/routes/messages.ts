@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { writeFile } from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { createNotification } from '../utils/notifications';
 
 const router = Router();
 
@@ -38,8 +39,8 @@ router.get('/', requireAuth, async (req, res) => {
     }
 
     // Check if interpreter is assigned to the dream
-    const isSuperAdmin = profile?.role === 'super_admin';
-    if (!dream.interpreterId && !isSuperAdmin) {
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+    if (!dream.interpreterId && !isAdmin) {
       return res.status(403).json({
         error: 'Messages are not available yet. An interpreter must be assigned to this dream first.'
       });
@@ -168,6 +169,22 @@ router.post('/', requireAuth, async (req, res) => {
         // No avatarUrl, fullName, or email exposed
       },
     };
+
+    if (userId === dream.dreamerId) {
+      createNotification(
+        dream.interpreterId,
+        'dream_message',
+        'The dreamer has replied to your response',
+        message.id
+      ).catch((error) => console.error('[Notifications] Dream message trigger error:', error));
+    } else if (userId === dream.interpreterId) {
+      createNotification(
+        dream.dreamerId,
+        'dream_message',
+        'An interpreter has responded to your dream',
+        message.id
+      ).catch((error) => console.error('[Notifications] Dream message trigger error:', error));
+    }
 
     return res.status(201).json(anonymousMessage);
   } catch (error) {

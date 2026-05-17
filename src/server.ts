@@ -19,6 +19,7 @@ import paymentsRoutes from "./routes/payments";
 import adminRouter from "./routes/admin";
 import adminPagesRouter from "./routes/admin-pages";
 import pagesRouter from "./routes/pages";
+import reviewsRouter from "./routes/reviews";
 
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
 
@@ -90,6 +91,7 @@ app.use("/api/payments", paymentsRoutes);
 app.use("/api/admin", adminRouter);
 app.use("/api/admin/pages", adminPagesRouter);
 app.use("/api/pages", pagesRouter);
+app.use("/api/reviews", reviewsRouter);
 
 // 404 handler
 app.use((_req, res) => {

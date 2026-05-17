@@ -5,6 +5,43 @@ import { optionalAuth, requireAuth } from "../middleware/auth";
 
 const router = Router();
 
+const planScopes = ["egypt", "international", "custom"] as const;
+
+function parseCountryCodes(value: unknown): string[] {
+  let parsedValue = value;
+  if (typeof value === "string") {
+    try {
+      parsedValue = JSON.parse(value);
+    } catch {
+      parsedValue = [];
+    }
+  }
+  if (!Array.isArray(parsedValue)) return [];
+  return parsedValue
+    .map((item) => (typeof item === "string" ? item.trim().toUpperCase() : ""))
+    .filter((item) => /^[A-Z]{2}$/.test(item));
+}
+
+function normalizeScope(value: unknown) {
+  return typeof value === "string" && planScopes.includes(value as any)
+    ? (value as (typeof planScopes)[number])
+    : null;
+}
+
+function matchesCountry(plan: any, country?: string) {
+  const normalizedCountry = country?.trim().toUpperCase();
+  if (!normalizedCountry) return true;
+  if (normalizedCountry === "OTHER" || normalizedCountry === "OUTSIDE_EGYPT") {
+    return plan.scope === "international";
+  }
+
+  if (plan.scope === "egypt") return normalizedCountry === "EG";
+  if (plan.scope === "international") return normalizedCountry !== "EG";
+  if (plan.scope === "custom") return parseCountryCodes(plan.countryCodes).includes(normalizedCountry);
+
+  return true;
+}
+
 function formatPlan(plan: any) {
   return {
     id: plan.id,
@@ -18,6 +55,8 @@ function formatPlan(plan: any) {
       : plan.features
       ? JSON.parse(plan.features)
       : [],
+    scope: plan.scope,
+    countryCodes: parseCountryCodes(plan.countryCodes),
     isActive: plan.isActive,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
@@ -27,6 +66,7 @@ function formatPlan(plan: any) {
 router.get("/", optionalAuth, async (req, res) => {
   try {
     const includeInactive = req.query.includeInactive === "true";
+    const country = typeof req.query.country === "string" ? req.query.country : undefined;
     const requesterRole = req.user?.role;
 
     const isElevated =
@@ -37,7 +77,9 @@ router.get("/", optionalAuth, async (req, res) => {
       orderBy: { price: "asc" },
     });
 
-    return res.json({ plans: plans.map(formatPlan) });
+    const filteredPlans = includeInactive && isElevated ? plans : plans.filter((plan) => matchesCountry(plan, country));
+
+    return res.json({ plans: filteredPlans.map(formatPlan) });
   } catch (error) {
     console.error("[Plans] Fetch error:", error);
     return res.status(500).json({ error: "Failed to fetch plans" });
@@ -46,10 +88,10 @@ router.get("/", optionalAuth, async (req, res) => {
 
 router.post("/", requireAuth, async (req, res) => {
   try {
-    if (req.user!.role !== "super_admin") {
+    if (req.user!.role !== "admin" && req.user!.role !== "super_admin") {
       return res
         .status(403)
-        .json({ error: "Forbidden - Super admin access required" });
+        .json({ error: "Forbidden - Admin access required" });
     }
 
     const {
@@ -59,6 +101,8 @@ router.post("/", requireAuth, async (req, res) => {
       currency,
       letterQuota,
       features,
+      scope = "egypt",
+      countryCodes = [],
       isActive = true,
     } = req.body ?? {};
 
@@ -78,6 +122,14 @@ router.post("/", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Plan letterQuota is required" });
     }
 
+    const normalizedScope = normalizeScope(scope);
+    if (!normalizedScope) {
+      return res.status(400).json({ error: "Invalid plan scope" });
+    }
+
+    const normalizedCountryCodes =
+      normalizedScope === "custom" ? parseCountryCodes(countryCodes) : [];
+
     const plan = await prisma.plan.create({
       data: {
         name,
@@ -86,6 +138,8 @@ router.post("/", requireAuth, async (req, res) => {
         currency: currency.toUpperCase(),
         letterQuota: Number(letterQuota),
         features: features ?? [],
+        scope: normalizedScope,
+        countryCodes: normalizedCountryCodes,
         isActive: Boolean(isActive),
       },
     });
@@ -99,10 +153,10 @@ router.post("/", requireAuth, async (req, res) => {
 
 router.patch("/:id", requireAuth, async (req, res) => {
   try {
-    if (req.user!.role !== "super_admin") {
+    if (req.user!.role !== "admin" && req.user!.role !== "super_admin") {
       return res
         .status(403)
-        .json({ error: "Forbidden - Super admin access required" });
+        .json({ error: "Forbidden - Admin access required" });
     }
 
     const { id } = req.params;
@@ -120,6 +174,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
       currency,
       letterQuota,
       features,
+      scope,
+      countryCodes,
       isActive,
     } = req.body ?? {};
 
@@ -135,6 +191,20 @@ router.patch("/:id", requireAuth, async (req, res) => {
       updateData.letterQuota = Number(letterQuota);
     }
     if (features !== undefined) updateData.features = features;
+    if (scope !== undefined) {
+      const normalizedScope = normalizeScope(scope);
+      if (!normalizedScope) {
+        return res.status(400).json({ error: "Invalid plan scope" });
+      }
+      updateData.scope = normalizedScope;
+      if (normalizedScope !== "custom" && countryCodes === undefined) {
+        updateData.countryCodes = [];
+      }
+    }
+    if (countryCodes !== undefined) {
+      const nextScope = (updateData.scope || existingPlan.scope) as string;
+      updateData.countryCodes = nextScope === "custom" ? parseCountryCodes(countryCodes) : [];
+    }
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
     const plan = await prisma.plan.update({
@@ -146,6 +216,44 @@ router.patch("/:id", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("[Plans] Update error:", error);
     return res.status(500).json({ error: "Failed to update plan" });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    if (req.user!.role !== "admin" && req.user!.role !== "super_admin") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden - Admin access required" });
+    }
+
+    const { id } = req.params;
+
+    const existingPlan = await prisma.plan.findUnique({ where: { id } });
+
+    if (!existingPlan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    const [payments, dreams, userPlans, dreamPurchases] = await Promise.all([
+      prisma.payment.count({ where: { planId: id } }),
+      prisma.dream.count({ where: { planId: id } }),
+      prisma.userPlan.count({ where: { planId: id } }),
+      prisma.dreamPlanPurchase.count({ where: { planId: id } }),
+    ]);
+
+    if (payments || dreams || userPlans || dreamPurchases) {
+      return res.status(409).json({
+        error: "Plan has related records. Deactivate it instead of deleting it.",
+      });
+    }
+
+    await prisma.plan.delete({ where: { id } });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("[Plans] Delete error:", error);
+    return res.status(500).json({ error: "Failed to delete plan" });
   }
 });
 

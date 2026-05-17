@@ -10,12 +10,31 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 const ALLOWED_SELF_SERVICE_ROLES = new Set(['dreamer', 'interpreter']);
 
+const normalizeRequiredString = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : '';
+
+const normalizeCountryCode = (value: unknown) =>
+  normalizeRequiredString(value).toUpperCase();
+
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, fullName, role = 'dreamer' } = req.body ?? {};
+    const {
+      email,
+      password,
+      fullName,
+      role = 'dreamer',
+      city: rawCity,
+      countryCode: rawCountryCode,
+    } = req.body ?? {};
+    const city = normalizeRequiredString(rawCity);
+    const countryCode = normalizeCountryCode(rawCountryCode);
 
-    if (!email || !password || !fullName) {
-      return res.status(400).json({ error: 'Email, password, and full name are required' });
+    if (!email || !password || !fullName || !city || !countryCode) {
+      return res.status(400).json({ error: 'Email, password, full name, city, and country code are required' });
+    }
+
+    if (!/^[A-Z]{2}$/.test(countryCode)) {
+      return res.status(400).json({ error: 'countryCode must be a valid ISO-2 country code' });
     }
 
     if (!ALLOWED_SELF_SERVICE_ROLES.has(role)) {
@@ -43,6 +62,8 @@ router.post('/register', async (req, res) => {
           email: createdUser.email,
           fullName,
           role,
+          city,
+          countryCode,
         },
       });
 
@@ -68,6 +89,8 @@ router.post('/register', async (req, res) => {
         role: profile.role,
         avatarUrl: profile.avatarUrl,
         bio: profile.bio,
+        city: profile.city,
+        countryCode: profile.countryCode,
         isAvailable: profile.isAvailable,
         totalInterpretations: profile.totalInterpretations,
         rating: profile.rating.toString(),
@@ -121,6 +144,8 @@ router.post('/login', async (req, res) => {
         role: user.profile.role,
         avatarUrl: user.profile.avatarUrl,
         bio: user.profile.bio,
+        city: user.profile.city,
+        countryCode: user.profile.countryCode,
         isAvailable: user.profile.isAvailable,
         totalInterpretations: user.profile.totalInterpretations,
         rating: user.profile.rating.toString(),
@@ -180,6 +205,8 @@ router.get('/me', requireAuth, async (req, res) => {
         role: profile.role,
         avatarUrl: profile.avatarUrl,
         bio: profile.bio,
+        city: profile.city,
+        countryCode: profile.countryCode,
         isAvailable: profile.isAvailable,
         totalInterpretations: profile.totalInterpretations,
         rating: profile.rating.toString(),

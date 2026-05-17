@@ -1,0 +1,3 @@
+ALTER TABLE `profiles`
+  ADD COLUMN `city` VARCHAR(100) NOT NULL DEFAULT 'Cairo',
+  ADD COLUMN `country_code` VARCHAR(2) NOT NULL DEFAULT 'EG';

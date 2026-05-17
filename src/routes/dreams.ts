@@ -1,9 +1,11 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { requireAuth } from "../middleware/auth";
 import { writeFile } from "fs/promises";
 import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { createNotification, createNotificationsForAdmins } from "../utils/notifications";
 
 const router = Router();
 
@@ -28,6 +30,26 @@ function countContentLetters(content: string) {
   // Count all Unicode characters (including Arabic, spaces, punctuation, etc.)
   // Array.from() properly handles Unicode surrogate pairs and Arabic characters
   return Array.from(content).length;
+}
+
+async function attachFeatureFlags(dreams: any[]) {
+  if (dreams.length === 0) return dreams;
+
+  const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
+    SELECT id, is_featured AS isFeatured, featured_at AS featuredAt
+    FROM dreams
+    WHERE id IN (${Prisma.join(dreams.map((dream) => dream.id))})
+  `);
+  const featureMap = new Map(rows.map((row) => [row.id, row]));
+
+  return dreams.map((dream) => {
+    const feature = featureMap.get(dream.id);
+    return {
+      ...dream,
+      isFeatured: Boolean(feature?.isFeatured),
+      featuredAt: feature?.featuredAt || null,
+    };
+  });
 }
 
 router.get("/", requireAuth, async (req, res) => {
@@ -119,7 +141,7 @@ router.get("/", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Invalid role" });
     }
 
-    return res.json(dreams);
+    return res.json(await attachFeatureFlags(dreams));
   } catch (error) {
     console.error("[Dreams] Fetch error:", error);
     return res.status(500).json({ error: "Failed to fetch dreams" });
@@ -179,6 +201,15 @@ router.post("/", requireAuth, async (req, res) => {
         },
       },
     });
+
+    if (!isAdmin) {
+      createNotificationsForAdmins(
+        "dream_submitted",
+        "A new dream has been submitted",
+        dream.id,
+        userId
+      ).catch((error) => console.error("[Notifications] Dream submitted trigger error:", error));
+    }
 
     return res.status(201).json(dream);
   } catch (error) {
@@ -284,6 +315,40 @@ router.get("/stats", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/featured", async (_req, res) => {
+  try {
+    const dreams = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT
+        id,
+        title,
+        content,
+        interpretation,
+        status,
+        created_at AS createdAt,
+        featured_at AS featuredAt
+      FROM dreams
+      WHERE is_featured = true
+      ORDER BY featured_at DESC, created_at DESC
+      LIMIT 12
+    `);
+
+    return res.json({
+      dreams: dreams.map((dream) => ({
+        id: dream.id,
+        title: dream.title,
+        preview: dream.content,
+        interpretation: dream.interpretation,
+        status: dream.status,
+        createdAt: dream.createdAt,
+        featuredAt: dream.featuredAt,
+      })),
+    });
+  } catch (error) {
+    console.error("[Dreams] Featured fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch featured dreams" });
+  }
+});
+
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
@@ -333,6 +398,64 @@ router.get("/:id", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("[Dreams] Fetch single error:", error);
     return res.status(500).json({ error: "Failed to fetch dream" });
+  }
+});
+
+router.patch("/:id/feature", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isFeatured } = req.body ?? {};
+    const userId = req.user!.userId;
+
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+
+    const nextFeatured = Boolean(isFeatured);
+    await prisma.$executeRaw(Prisma.sql`
+      UPDATE dreams
+      SET is_featured = ${nextFeatured}, featured_at = ${nextFeatured ? new Date() : null}
+      WHERE id = ${id}
+    `);
+
+    const dream = await prisma.dream.findUnique({
+      where: { id },
+      include: {
+        dreamer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        interpreter: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: "Dream not found" });
+    }
+
+    const [formattedDream] = await attachFeatureFlags([dream]);
+    return res.json({ dream: formattedDream });
+  } catch (error) {
+    console.error("[Dreams] Feature update error:", error);
+    return res.status(500).json({ error: "Failed to update featured dream" });
   }
 });
 
@@ -430,6 +553,42 @@ router.patch("/:id", requireAuth, async (req, res) => {
       },
     });
 
+    if (interpreter_id && interpreter_id !== dream.interpreterId) {
+      Promise.all([
+        createNotification(
+          dream.dreamerId,
+          "dream_assigned",
+          "Your dream has been assigned to an interpreter",
+          id
+        ),
+        createNotification(
+          interpreter_id,
+          "dream_assigned",
+          "A new dream has been assigned to you",
+          id
+        ),
+      ]).catch((error) => console.error("[Notifications] Dream assignment trigger error:", error));
+    }
+
+    if (status && status !== dream.status && !interpreter_id) {
+      const recipients = [dream.dreamerId, dream.interpreterId].filter(
+        (recipientId): recipientId is string => Boolean(recipientId && recipientId !== userId)
+      );
+
+      if (recipients.length > 0) {
+        Promise.all(
+          recipients.map((recipientId) =>
+            createNotification(
+              recipientId,
+              "dream_status_changed",
+              `Dream status changed to ${status}`,
+              id
+            )
+          )
+        ).catch((error) => console.error("[Notifications] Dream status trigger error:", error));
+      }
+    }
+
     return res.json(updatedDream);
   } catch (error) {
     console.error("[Dreams] Update error:", error);
@@ -448,7 +607,15 @@ router.delete("/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Dream not found" });
     }
 
-    if (dream.dreamerId !== userId) {
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isAdmin =
+      profile?.role === "admin" || profile?.role === "super_admin";
+
+    if (dream.dreamerId !== userId && !isAdmin) {
       return res.status(403).json({ error: "Forbidden" });
     }
 

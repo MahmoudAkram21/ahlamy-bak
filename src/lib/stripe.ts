@@ -4,7 +4,7 @@ let stripe: Stripe | null = null;
 
 if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_YOUR_SECRET_KEY_HERE') {
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-        apiVersion: '2025-12-15.clover',
+        apiVersion: '2026-02-25.clover',
         typescript: true,
     });
     console.log('✅ Stripe initialized');

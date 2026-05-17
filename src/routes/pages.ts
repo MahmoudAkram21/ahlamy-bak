@@ -8,7 +8,7 @@ router.get('/:pageKey', async (req, res) => {
     try {
         const { pageKey } = req.params;
 
-        const page = await prisma.pageContent.findUnique({
+        const page = await prisma.pageContent.findFirst({
             where: {
                 pageKey,
                 isPublished: true,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
+import { createNotification } from '../utils/notifications';
 
 const router = Router();
 
@@ -125,6 +126,22 @@ router.post('/', requireAuth, async (req, res) => {
         },
       },
     });
+
+    if (request.interpreterId && userId === request.dreamerId) {
+      createNotification(
+        request.interpreterId,
+        'dream_message',
+        'The dreamer has replied to your response',
+        message.id
+      ).catch((error) => console.error('[Notifications] Dreamer reply trigger error:', error));
+    } else if (userId === request.interpreterId) {
+      createNotification(
+        request.dreamerId,
+        'dream_message',
+        'An interpreter has responded to your dream',
+        message.id
+      ).catch((error) => console.error('[Notifications] Interpreter response trigger error:', error));
+    }
 
     return res.json(message);
   } catch (error) {
