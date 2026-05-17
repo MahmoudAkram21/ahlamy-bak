@@ -40,17 +40,44 @@ if (!fs.existsSync(audioDir)) {
   console.log("✅ Created audio directory:", audioDir);
 }
 
-const allowedOrigins = (
-  process.env.CORS_ORIGINS || getDefaultCorsOrigins().join(",")
-)
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const parseCsvEnv = (value: string | undefined) =>
+  (value || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const allowedOrigins = parseCsvEnv(process.env.CORS_ORIGINS || getDefaultCorsOrigins().join(","));
+const allowedOriginPatterns = parseCsvEnv(process.env.CORS_ORIGIN_PATTERNS)
+  .map((pattern) => {
+    try {
+      return new RegExp(pattern);
+    } catch (error) {
+      console.warn(`[CORS] Ignoring invalid origin pattern "${pattern}":`, error);
+      return null;
+    }
+  })
+  .filter((pattern): pattern is RegExp => Boolean(pattern));
+
+function isAllowedOrigin(origin: string) {
+  const normalizedOrigin = origin.replace(/\/$/, "");
+  return (
+    allowedOrigins.includes(normalizedOrigin) ||
+    allowedOriginPatterns.some((pattern) => pattern.test(normalizedOrigin))
+  );
+}
 
 // CORS configuration
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      console.warn(`[CORS] Blocked origin: ${origin}`);
+      callback(null, false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
@@ -137,5 +164,8 @@ app.listen(port, () => {
   console.log(`📍 Running on: http://localhost:${port}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`✅ CORS enabled for: ${allowedOrigins.join(", ")}`);
+  if (allowedOriginPatterns.length > 0) {
+    console.log(`✅ CORS origin patterns: ${allowedOriginPatterns.map((pattern) => pattern.source).join(", ")}`);
+  }
   console.log(`📁 Uploads directory: ${uploadsDir}\n`);
 });
