@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth";
 import stripe from "../lib/stripe";
 import prisma from "../lib/prisma";
 import { Prisma } from "@prisma/client";
+import { appBaseUrl } from "../config/urls";
 
 const router = Router();
 
@@ -108,8 +109,8 @@ router.post("/purchase-for-dream", requireAuth, async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}&dreamId=${dreamId}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/cancel?dreamId=${dreamId}`,
+      success_url: `${appBaseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&dreamId=${dreamId}`,
+      cancel_url: `${appBaseUrl}/payment/cancel?dreamId=${dreamId}`,
       metadata: {
         userId: userId,
         planId: plan.id,
@@ -184,8 +185,8 @@ router.post("/create-checkout-session", requireAuth, async (req, res) => {
         },
       ],
       mode: "payment", // One-time payment (can change to 'subscription' later)
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/cancel`,
+      success_url: `${appBaseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appBaseUrl}/payment/cancel`,
       metadata: {
         userId: userId,
         planId: plan.id,

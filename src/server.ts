@@ -20,6 +20,7 @@ import adminRouter from "./routes/admin";
 import adminPagesRouter from "./routes/admin-pages";
 import pagesRouter from "./routes/pages";
 import reviewsRouter from "./routes/reviews";
+import { getDefaultCorsOrigins } from "./config/urls";
 
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
 
@@ -40,7 +41,7 @@ if (!fs.existsSync(audioDir)) {
 }
 
 const allowedOrigins = (
-  process.env.CORS_ORIGINS || "http://localhost:3000,http://localhost:5173"
+  process.env.CORS_ORIGINS || getDefaultCorsOrigins().join(",")
 )
   .split(",")
   .map((origin) => origin.trim())
