@@ -68,13 +68,24 @@ app.use(morgan("dev"));
 // Static file serving for uploads
 app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 
-// Health check endpoint
+const healthPayload = () => ({
+  status: "ok",
+  service: "mubasharat-backend",
+  environment: process.env.NODE_ENV || "development",
+  timestamp: new Date().toISOString(),
+  uptime: process.uptime(),
+  port: Number(process.env.PORT) || 5000,
+});
+
+// Health check endpoints
+app.get("/health", (_req, res) => {
+  res.json(healthPayload());
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({
-    status: "ok",
-    service: "mubasharat-backend",
-    timestamp: new Date().toISOString(),
-    port: Number(process.env.PORT) || 5000,
+    ...healthPayload(),
+    path: "/api/health",
   });
 });
 
