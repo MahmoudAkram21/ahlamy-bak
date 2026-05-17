@@ -30,6 +30,36 @@ router.get("/featured", async (_req, res) => {
   }
 });
 
+router.get("/", async (_req, res) => {
+  try {
+    const reviews = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT
+        id,
+        reviewer_name AS reviewerName,
+        content,
+        rating,
+        source,
+        is_featured AS isFeatured,
+        created_at AS createdAt
+      FROM reviews
+      WHERE is_published = true
+      ORDER BY is_featured DESC, created_at DESC
+    `);
+
+    return res.json({
+      reviews: reviews.map((review) =>
+        normalizeReviewText({
+          ...review,
+          isFeatured: Boolean(review.isFeatured),
+        })
+      ),
+    });
+  } catch (error) {
+    console.error("[Reviews] Published fetch error:", error);
+    return res.status(500).json({ error: "Failed to fetch reviews" });
+  }
+});
+
 router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;

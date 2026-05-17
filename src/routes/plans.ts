@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { optionalAuth, requireAuth } from "../middleware/auth";
+import { normalizePlanName } from "../utils/planText";
 
 const router = Router();
 
@@ -45,7 +46,7 @@ function matchesCountry(plan: any, country?: string) {
 function formatPlan(plan: any) {
   return {
     id: plan.id,
-    name: plan.name,
+    name: normalizePlanName(plan.name),
     description: plan.description,
     price: Number(plan.price),
     currency: plan.currency,

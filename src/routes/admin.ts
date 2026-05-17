@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '../utils/auth';
 import { normalizeReviewText } from '../utils/reviewText';
+import { normalizePlanName } from '../utils/planText';
 
 const router = Router();
 
@@ -78,6 +79,33 @@ const reviewSelect = Prisma.sql`
   FROM reviews
 `;
 
+function getMonthRange(monthValue: unknown) {
+  const monthPattern = /^(\d{4})-(\d{2})$/;
+  const now = new Date();
+  const fallback = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const normalizedMonth = typeof monthValue === 'string' && monthPattern.test(monthValue) ? monthValue : fallback;
+  const [, yearValue, monthPartValue] = normalizedMonth.match(monthPattern)!;
+  const year = Number(yearValue);
+  const monthIndex = Number(monthPartValue) - 1;
+
+  if (monthIndex < 0 || monthIndex > 11) {
+    const fallbackStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const fallbackEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1));
+
+    return {
+      month: fallback,
+      startDate: fallbackStart,
+      endDate: fallbackEnd,
+    };
+  }
+
+  return {
+    month: normalizedMonth,
+    startDate: new Date(Date.UTC(year, monthIndex, 1)),
+    endDate: new Date(Date.UTC(year, monthIndex + 1, 1)),
+  };
+}
+
 router.get('/stats', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
@@ -115,6 +143,101 @@ router.get('/stats', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('[Admin] Stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+router.get('/interpreter-statistics', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    const { month, startDate, endDate } = getMonthRange(req.query.month);
+
+    const [interpreters, plans, rows] = await Promise.all([
+      prisma.profile.findMany({
+        where: { role: 'interpreter' },
+        orderBy: [{ isAvailable: 'desc' }, { fullName: 'asc' }],
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          isAvailable: true,
+        },
+      }),
+      prisma.plan.findMany({
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          isActive: true,
+        },
+      }),
+      prisma.$queryRaw<any[]>(Prisma.sql`
+        SELECT
+          r.interpreter_id AS interpreterId,
+          d.plan_id AS planId,
+          COUNT(*) AS requestCount
+        FROM requests r
+        INNER JOIN dreams d ON d.id = r.dream_id
+        WHERE r.status = 'completed'
+          AND r.interpreter_id IS NOT NULL
+          AND COALESCE(r.completed_at, r.updated_at) >= ${startDate}
+          AND COALESCE(r.completed_at, r.updated_at) < ${endDate}
+        GROUP BY r.interpreter_id, d.plan_id
+      `),
+    ]);
+
+    const interpreterMap = new Map(
+      interpreters.map((interpreter) => [
+        interpreter.id,
+        {
+          id: interpreter.id,
+          fullName: interpreter.fullName,
+          email: interpreter.email,
+          isAvailable: interpreter.isAvailable,
+          totalCompletedRequests: 0,
+          planCounts: [] as Array<{ planId: string | null; planName: string; requestCount: number }>,
+        },
+      ]),
+    );
+
+    const planNameById = new Map(plans.map((plan) => [plan.id, normalizePlanName(plan.name) || plan.name]));
+
+    rows.forEach((row) => {
+      const interpreter = interpreterMap.get(row.interpreterId);
+      if (!interpreter) return;
+
+      const requestCount = Number(row.requestCount || 0);
+      const planId = row.planId || null;
+
+      interpreter.totalCompletedRequests += requestCount;
+      interpreter.planCounts.push({
+        planId,
+        planName: planId ? planNameById.get(planId) || 'Unknown plan' : 'No plan',
+        requestCount,
+      });
+    });
+
+    return res.json({
+      month,
+      startDate,
+      endDate,
+      plans: plans.map((plan) => ({
+        id: plan.id,
+        name: normalizePlanName(plan.name) || plan.name,
+        isActive: plan.isActive,
+      })),
+      interpreters: Array.from(interpreterMap.values()).sort(
+        (a, b) => b.totalCompletedRequests - a.totalCompletedRequests || a.email.localeCompare(b.email),
+      ),
+    });
+  } catch (error) {
+    console.error('[Admin] Interpreter statistics error:', error);
+    return res.status(500).json({ error: 'Failed to fetch interpreter statistics' });
   }
 });
 

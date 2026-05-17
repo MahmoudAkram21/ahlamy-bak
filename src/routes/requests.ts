@@ -206,6 +206,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (interpreterId && !status) {
       updateData.status = 'in_progress';
     }
+    if (status === 'completed' && existingRequest.status !== 'completed') {
+      updateData.completedAt = new Date();
+    }
+    if (status && status !== 'completed' && existingRequest.status === 'completed') {
+      updateData.completedAt = null;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid updates provided' });
