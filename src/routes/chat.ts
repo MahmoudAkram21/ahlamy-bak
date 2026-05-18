@@ -89,8 +89,8 @@ router.get('/', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    // Check if interpreter is assigned
-    if (!request.interpreterId && !isSuperAdmin) {
+    // Dreamers can see their own initial paid message before assignment.
+    if (!request.interpreterId && !isSuperAdmin && request.dreamerId !== req.user!.userId) {
       return res.status(403).json({
         error: 'Chat is not available yet. An interpreter must be assigned to this request first.'
       });
@@ -135,15 +135,11 @@ router.post('/', requireAuth, async (req, res) => {
         dreamerId: true,
         interpreterId: true,
         status: true,
-        dream: {
+        plan: {
           select: {
-            plan: {
-              select: {
-                letterQuota: true,
-                supportsVoiceNotes: true,
-                voiceNoteMaxSeconds: true,
-              },
-            },
+            letterQuota: true,
+            supportsVoiceNotes: true,
+            voiceNoteMaxSeconds: true,
           },
         },
       },
@@ -181,19 +177,19 @@ router.post('/', requireAuth, async (req, res) => {
     const isDreamer = request.dreamerId === userId;
     const isInterpreter = request.interpreterId === userId;
     const existingMessageCount = await prisma.chatMessage.count({ where: { requestId: request_id } });
-    let fileUrl: string | null = null;
+    let audioUrl: string | null = null;
     let nextMessageType = message_type || 'text';
 
     if (hasAudio) {
       if (isDreamer) {
-        const maxSeconds = request.dream.plan?.voiceNoteMaxSeconds;
+        const maxSeconds = request.plan?.voiceNoteMaxSeconds;
         const durationSeconds = Number(audioDuration || 0);
 
         if (existingMessageCount > 0) {
           return res.status(400).json({ error: 'Dreamers can only send a voice note as the first message' });
         }
 
-        if (!request.dream.plan?.supportsVoiceNotes || !maxSeconds) {
+        if (!request.plan?.supportsVoiceNotes || !maxSeconds) {
           return res.status(400).json({ error: 'This plan does not support voice notes' });
         }
 
@@ -204,15 +200,15 @@ router.post('/', requireAuth, async (req, res) => {
         return res.status(403).json({ error: 'Only participants can send voice notes' });
       }
 
-      fileUrl = await saveAudioMessage(userId, audio);
-      if (!fileUrl) {
+      audioUrl = await saveAudioMessage(userId, audio);
+      if (!audioUrl) {
         return res.status(400).json({ error: 'Invalid audio data' });
       }
       nextMessageType = 'audio';
     }
 
     if (isDreamer && !hasAudio && existingMessageCount === 0) {
-      const letterQuota = request.dream.plan?.letterQuota;
+      const letterQuota = request.plan?.letterQuota;
       if (letterQuota && countLetters(normalizedContent) > letterQuota) {
         return res.status(400).json({ error: `Message exceeds plan letter quota of ${letterQuota}` });
       }
@@ -222,9 +218,9 @@ router.post('/', requireAuth, async (req, res) => {
       data: {
         requestId: request_id,
         senderId: userId,
-        content: normalizedContent || '[رسالة صوتية]',
+        content: normalizedContent || null,
         messageType: nextMessageType,
-        fileUrl,
+        audioUrl,
       },
       include: {
         sender: {
@@ -242,14 +238,14 @@ router.post('/', requireAuth, async (req, res) => {
     if (request.interpreterId && userId === request.dreamerId) {
       createNotification(
         request.interpreterId,
-        'dream_message',
+        'request_message',
         'The dreamer has replied to your response',
         message.id
       ).catch((error) => console.error('[Notifications] Dreamer reply trigger error:', error));
     } else if (userId === request.interpreterId) {
       createNotification(
         request.dreamerId,
-        'dream_message',
+        'request_message',
         'An interpreter has responded to your dream',
         message.id
       ).catch((error) => console.error('[Notifications] Interpreter response trigger error:', error));

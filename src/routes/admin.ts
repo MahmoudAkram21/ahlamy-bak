@@ -127,7 +127,7 @@ router.get('/stats', requireAuth, async (req, res) => {
     const [totalUsers, totalRequests, completedRequests, totalPlans, totalRevenueAggregate] = await Promise.all([
       prisma.profile.count({ where: { deletedAt: null } }),
       prisma.request.count({ where: { dream: { deletedAt: null } } }),
-      prisma.request.count({ where: { status: 'completed', dream: { deletedAt: null } } }),
+      prisma.request.count({ where: { status: 'closed', dream: { deletedAt: null } } }),
       prisma.plan.count({ where: { deletedAt: null } }),
       prisma.payment.aggregate({
         _sum: { amount: true },
@@ -188,16 +188,16 @@ router.get('/interpreter-statistics', requireAuth, async (req, res) => {
       prisma.$queryRaw<any[]>(Prisma.sql`
         SELECT
           r.interpreter_id AS interpreterId,
-          d.plan_id AS planId,
+          r.plan_id AS planId,
           COUNT(*) AS requestCount
         FROM requests r
         INNER JOIN dreams d ON d.id = r.dream_id
-      WHERE r.status = 'completed'
+      WHERE r.status = 'closed'
           AND d.deleted_at IS NULL
           AND r.interpreter_id IS NOT NULL
-          AND COALESCE(r.completed_at, r.updated_at) >= ${startDate}
-          AND COALESCE(r.completed_at, r.updated_at) < ${endDate}
-        GROUP BY r.interpreter_id, d.plan_id
+          AND r.updated_at >= ${startDate}
+          AND r.updated_at < ${endDate}
+        GROUP BY r.interpreter_id, r.plan_id
       `),
     ]);
 
@@ -746,7 +746,7 @@ router.get('/payments', requireAuth, async (req, res) => {
         id: payment.id,
         userId: payment.userId,
         planId: payment.planId,
-        dreamId: payment.dreamId,
+        requestId: payment.requestId,
         amount: Number(payment.amount),
         currency: payment.currency,
         status: payment.status,

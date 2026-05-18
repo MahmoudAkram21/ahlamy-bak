@@ -7,6 +7,7 @@ import { existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
 const router = Router();
+const bypassPaymentGateway = process.env.BYPASS_PAYMENT_GATEWAY === "true";
 
 function countLetters(content: string) {
   return Array.from(content || "").length;
@@ -214,14 +215,44 @@ router.post("/", requireAuth, async (req, res) => {
           dreamerId: userId,
           planId,
           submissionType: normalizedSubmissionType as SubmissionType,
-          dreamDescriptionText: normalizedSubmissionType === "text" ? textValue : null,
-          dreamDescriptionAudioUrl: normalizedSubmissionType === "audio" ? audioUrl : null,
-          status: "draft",
+          dreamDescriptionText:
+            !bypassPaymentGateway && normalizedSubmissionType === "text" ? textValue : null,
+          dreamDescriptionAudioUrl:
+            !bypassPaymentGateway && normalizedSubmissionType === "audio" ? audioUrl : null,
+          status: bypassPaymentGateway ? "paid" : "draft",
         },
+      });
+
+      if (bypassPaymentGateway) {
+        await tx.requestPlanPurchase.create({
+          data: {
+            requestId: request.id,
+            planId,
+            submissionType: normalizedSubmissionType as SubmissionType,
+            letterQuota: plan.letterQuota,
+            lettersUsed: 0,
+            voiceNoteMaxSeconds:
+              normalizedSubmissionType === "audio" ? plan.voiceNoteMaxSeconds : null,
+          },
+        });
+
+        await tx.chatMessage.create({
+          data: {
+            requestId: request.id,
+            senderId: userId,
+            content: normalizedSubmissionType === "text" ? textValue : null,
+            messageType: normalizedSubmissionType as SubmissionType,
+            audioUrl: normalizedSubmissionType === "audio" ? audioUrl : null,
+          },
+        });
+      }
+
+      const requestWithRelations = await tx.request.findUniqueOrThrow({
+        where: { id: request.id },
         include: requestInclude,
       });
 
-      return { ...dream, requests: [request] };
+      return { ...dream, requests: [requestWithRelations] };
     });
 
     return res.status(201).json(formatDream(result));

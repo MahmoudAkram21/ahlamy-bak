@@ -10,8 +10,6 @@ import http from "http";
 import authRouter from "./routes/auth";
 import profileRouter from "./routes/profile";
 import dreamsRouter from "./routes/dreams";
-import messagesRouter from "./routes/messages";
-import commentsRouter from "./routes/comments";
 import requestsRouter from "./routes/requests";
 import chatRouter from "./routes/chat";
 import notificationsRouter from "./routes/notifications";
@@ -86,6 +84,9 @@ app.use(
   })
 );
 
+// Stripe webhook signature verification needs the raw request body.
+app.use("/api/payments/webhook", express.raw({ type: "application/json", limit: "10mb" }));
+
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -122,8 +123,6 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/dreams", dreamsRouter);
-app.use("/api/messages", messagesRouter);
-app.use("/api/comments", commentsRouter);
 app.use("/api/requests", requestsRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/notifications", notificationsRouter);

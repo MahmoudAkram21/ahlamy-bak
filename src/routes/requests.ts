@@ -1,196 +1,170 @@
-import { Router } from 'express';
-import prisma from '../lib/prisma';
-import { requireAuth } from '../middleware/auth';
-import { createNotification } from '../utils/notifications';
+import { Router } from "express";
+import { Prisma, RequestStatus, SubmissionType } from "@prisma/client";
+import prisma from "../lib/prisma";
+import { requireAuth } from "../middleware/auth";
+import { createNotification } from "../utils/notifications";
 
 const router = Router();
 
-router.get('/', requireAuth, async (req, res) => {
+const requestInclude = {
+  dream: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      createdAt: true,
+    },
+  },
+  plan: {
+    select: {
+      id: true,
+      name: true,
+      letterQuota: true,
+      supportsVoiceNotes: true,
+      voiceNoteMaxSeconds: true,
+    },
+  },
+  dreamer: {
+    select: { id: true, fullName: true, email: true, avatarUrl: true },
+  },
+  interpreter: {
+    select: { id: true, fullName: true, email: true, avatarUrl: true },
+  },
+  planPurchase: true,
+} satisfies Prisma.RequestInclude;
+
+function formatRequest(request: any) {
+  return {
+    ...request,
+    title: request.dream?.title,
+    description: request.dream?.description,
+    dream: request.dream
+      ? {
+          ...request.dream,
+          content: request.dream.description,
+          plan: request.plan ?? null,
+        }
+      : null,
+  };
+}
+
+function normalizeStatus(value: unknown) {
+  const allowed: RequestStatus[] = ["draft", "pending_payment", "paid", "open", "in_progress", "closed", "cancelled"];
+  return typeof value === "string" && allowed.includes(value as RequestStatus)
+    ? (value as RequestStatus)
+    : null;
+}
+
+function normalizeSubmissionType(value: unknown) {
+  return value === "text" || value === "audio" ? (value as SubmissionType) : null;
+}
+
+router.get("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-
     const profile = await prisma.profile.findFirst({
       where: { id: userId, deletedAt: null },
       select: { role: true },
     });
 
-    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
+    const status = normalizeStatus(req.query.status);
 
     const requests = await prisma.request.findMany({
-      where: isAdmin
-        ? { dream: { deletedAt: null } }
-        : {
-            OR: [{ dreamerId: userId }, { interpreterId: userId }],
-            dream: { deletedAt: null },
-          },
-      include: {
-        dream: {
-          select: {
-            id: true,
-            title: true,
-            content: true,
-            status: true,
-            plan: {
-              select: {
-                id: true,
-                letterQuota: true,
-                supportsVoiceNotes: true,
-                voiceNoteMaxSeconds: true,
-              },
-            },
-          },
-        },
-        dreamer: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
-        interpreter: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
+      where: {
+        ...(status ? { status } : {}),
+        ...(isAdmin ? {} : { OR: [{ dreamerId: userId }, { interpreterId: userId }] }),
+        dream: { deletedAt: null },
       },
-      orderBy: { createdAt: 'desc' },
+      include: requestInclude,
+      orderBy: { createdAt: "desc" },
     });
 
-    return res.json(requests);
+    return res.json(requests.map(formatRequest));
   } catch (error) {
-    console.error('[Requests] Fetch error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("[Requests] Fetch error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.post('/', requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const { dream_id, title, description, budget } = req.body ?? {};
+    const { dreamId, planId, submissionType, dreamDescriptionText, dreamDescriptionAudioUrl } = req.body ?? {};
 
-    if (!dream_id || !title) {
-      return res.status(400).json({ error: 'dream_id and title are required' });
+    if (!dreamId || !planId) {
+      return res.status(400).json({ error: "dreamId and planId are required" });
     }
 
     const dream = await prisma.dream.findFirst({
-      where: { id: dream_id, deletedAt: null },
+      where: { id: dreamId, dreamerId: userId, deletedAt: null },
       select: { id: true, dreamerId: true },
     });
 
     if (!dream) {
-      return res.status(404).json({ error: 'Dream not found' });
+      return res.status(404).json({ error: "Dream not found" });
     }
 
-    if (dream.dreamerId !== userId) {
-      return res.status(403).json({ error: 'You can only create requests for your own dreams' });
-    }
+    const normalizedSubmissionType = normalizeSubmissionType(submissionType);
 
-    const newRequest = await prisma.request.create({
+    const request = await prisma.request.create({
       data: {
-        dreamId: dream_id,
+        dreamId,
         dreamerId: userId,
-        title,
-        description,
-        budget: budget ? parseFloat(budget) : null,
-        status: 'open',
+        planId,
+        submissionType: normalizedSubmissionType,
+        dreamDescriptionText: normalizedSubmissionType === "text" ? dreamDescriptionText ?? null : null,
+        dreamDescriptionAudioUrl: normalizedSubmissionType === "audio" ? dreamDescriptionAudioUrl ?? null : null,
+        status: "draft",
       },
-      include: {
-        dream: true,
-        dreamer: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      include: requestInclude,
     });
 
-    return res.json(newRequest);
+    return res.status(201).json(formatRequest(request));
   } catch (error) {
-    console.error('[Requests] Create error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("[Requests] Create error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.get('/:id', requireAuth, async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
     const userId = req.user!.userId;
-
-    const requestData = await prisma.request.findFirst({
-      where: { id, dream: { deletedAt: null } },
-      include: {
-        dream: {
-          include: {
-            plan: {
-              select: {
-                id: true,
-                letterQuota: true,
-                supportsVoiceNotes: true,
-                voiceNoteMaxSeconds: true,
-              },
-            },
-          },
-        },
-        dreamer: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-        interpreter: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+    const request = await prisma.request.findFirst({
+      where: { id: req.params.id, dream: { deletedAt: null } },
+      include: requestInclude,
     });
 
-    if (!requestData) {
-      return res.status(404).json({ error: 'Request not found' });
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" });
     }
 
     const profile = await prisma.profile.findFirst({
       where: { id: userId, deletedAt: null },
       select: { role: true },
     });
+    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
 
-    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-
-    const hasAccess =
-      isAdmin ||
-      requestData.dreamerId === userId ||
-      requestData.interpreterId === userId;
-
-    if (!hasAccess) {
-      return res.status(403).json({ error: 'Forbidden' });
+    if (!isAdmin && request.dreamerId !== userId && request.interpreterId !== userId) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
-    return res.json(requestData);
+    return res.json(formatRequest(request));
   } catch (error) {
-    console.error('[Requests] Fetch single error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("[Requests] Fetch single error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch("/:id", requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
     const requesterId = req.user!.userId;
-    const { status, interpreterId } = req.body ?? {};
+    const { status, interpreterId, submissionType, dreamDescriptionText, dreamDescriptionAudioUrl } = req.body ?? {};
 
     const existingRequest = await prisma.request.findFirst({
-      where: { id, dream: { deletedAt: null } },
+      where: { id: req.params.id, dream: { deletedAt: null } },
       select: {
+        id: true,
         dreamerId: true,
         interpreterId: true,
         status: true,
@@ -198,7 +172,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
     });
 
     if (!existingRequest) {
-      return res.status(404).json({ error: 'Request not found' });
+      return res.status(404).json({ error: "Request not found" });
     }
 
     const profile = await prisma.profile.findFirst({
@@ -207,124 +181,114 @@ router.patch('/:id', requireAuth, async (req, res) => {
     });
 
     const role = profile?.role;
-    const isSuperAdmin = role === 'super_admin';
-    const isAdmin = role === 'admin';
+    const isSuperAdmin = role === "super_admin";
+    const isAdmin = role === "admin";
     const isDreamer = existingRequest.dreamerId === requesterId;
     const isInterpreter = existingRequest.interpreterId === requesterId;
 
     if (!isSuperAdmin && !isAdmin && !isDreamer && !isInterpreter) {
-      return res.status(403).json({ error: 'Forbidden' });
+      return res.status(403).json({ error: "Forbidden" });
     }
+
+    const updateData: Prisma.RequestUpdateInput = {};
 
     if (interpreterId) {
       if (!isAdmin && !isSuperAdmin) {
-        return res.status(403).json({ error: 'Only admins can assign interpreters' });
+        return res.status(403).json({ error: "Only admins can assign interpreters" });
       }
+      updateData.interpreter = { connect: { id: interpreterId } };
+      updateData.status = "in_progress";
     }
 
-    const isClosingOrReopening = status === 'closed' || (existingRequest.status === 'closed' && status === 'in_progress');
-    if (isClosingOrReopening && !isSuperAdmin && !isAdmin && !isInterpreter) {
-      return res.status(403).json({ error: 'Only the assigned interpreter or an admin can close or reopen requests' });
+    const nextStatus = normalizeStatus(status);
+    if (status && !nextStatus) {
+      return res.status(400).json({ error: "Invalid request status" });
     }
 
-    if (status && !isClosingOrReopening && !isSuperAdmin && !isDreamer && !isInterpreter) {
-      return res.status(403).json({ error: 'Only the dreamer, assigned interpreter, or super admin can update status' });
+    if (nextStatus) {
+      const isClosingOrReopening =
+        nextStatus === "closed" ||
+        (existingRequest.status === "closed" && ["open", "in_progress"].includes(nextStatus));
+
+      if (isClosingOrReopening && !isSuperAdmin && !isAdmin && !isInterpreter) {
+        return res.status(403).json({ error: "Only the assigned interpreter or an admin can close or reopen requests" });
+      }
+
+      if (!isClosingOrReopening && !isSuperAdmin && !isAdmin && !isDreamer && !isInterpreter) {
+        return res.status(403).json({ error: "You cannot update this request status" });
+      }
+
+      updateData.status = nextStatus;
     }
 
-    const updateData: Record<string, unknown> = {};
-    if (status) updateData.status = status;
-    if (interpreterId) updateData.interpreterId = interpreterId;
-    if (interpreterId && !status) {
-      updateData.status = 'in_progress';
+    const nextSubmissionType = normalizeSubmissionType(submissionType);
+    if (submissionType !== undefined) {
+      if (!isDreamer || !["draft", "pending_payment"].includes(existingRequest.status)) {
+        return res.status(403).json({ error: "Only the dreamer can edit draft request submission details" });
+      }
+      if (!nextSubmissionType) {
+        return res.status(400).json({ error: "Invalid submission type" });
+      }
+      updateData.submissionType = nextSubmissionType;
     }
-    if (status === 'completed' && existingRequest.status !== 'completed') {
-      updateData.completedAt = new Date();
-    }
-    if (status && status !== 'completed' && existingRequest.status === 'completed') {
-      updateData.completedAt = null;
+
+    if (dreamDescriptionText !== undefined || dreamDescriptionAudioUrl !== undefined) {
+      if (!isDreamer || !["draft", "pending_payment"].includes(existingRequest.status)) {
+        return res.status(403).json({ error: "Only the dreamer can edit draft request details" });
+      }
+      if (dreamDescriptionText !== undefined) updateData.dreamDescriptionText = dreamDescriptionText || null;
+      if (dreamDescriptionAudioUrl !== undefined) updateData.dreamDescriptionAudioUrl = dreamDescriptionAudioUrl || null;
     }
 
     if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ error: 'No valid updates provided' });
+      return res.status(400).json({ error: "No valid updates provided" });
     }
 
     const updatedRequest = await prisma.request.update({
-      where: { id },
+      where: { id: existingRequest.id },
       data: updateData,
-      include: {
-        dream: {
-          include: {
-            plan: {
-              select: {
-                id: true,
-                letterQuota: true,
-                supportsVoiceNotes: true,
-                voiceNoteMaxSeconds: true,
-              },
-            },
-          },
-        },
-        dreamer: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-        interpreter: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: requestInclude,
     });
 
     if (interpreterId && interpreterId !== existingRequest.interpreterId) {
       Promise.all([
         createNotification(
           existingRequest.dreamerId,
-          'request_assigned',
-          'Your dream has been assigned to an interpreter',
-          id
+          "request_assigned",
+          "Your request has been assigned to an interpreter",
+          existingRequest.id,
         ),
         createNotification(
           interpreterId,
-          'request_assigned',
-          'A new dream has been assigned to you',
-          id
+          "request_assigned",
+          "A new request has been assigned to you",
+          existingRequest.id,
         ),
-      ]).catch((error) => console.error('[Notifications] Request assignment trigger error:', error));
+      ]).catch((error) => console.error("[Notifications] Request assignment trigger error:", error));
     }
 
-    if (status && status !== existingRequest.status) {
+    if (nextStatus && nextStatus !== existingRequest.status) {
       const recipientIds = [existingRequest.dreamerId, existingRequest.interpreterId].filter(
-        (recipientId): recipientId is string => Boolean(recipientId && recipientId !== requesterId)
+        (recipientId): recipientId is string => Boolean(recipientId && recipientId !== requesterId),
       );
 
-      if (recipientIds.length > 0) {
-        Promise.all(
-          recipientIds.map((recipientId) =>
-            createNotification(
-              recipientId,
-              'request_status_changed',
-              `Dream request status changed to ${status}`,
-              id
-            )
-          )
-        ).catch((error) => console.error('[Notifications] Request status trigger error:', error));
-      }
+      Promise.all(
+        recipientIds.map((recipientId) =>
+          createNotification(
+            recipientId,
+            "request_status_changed",
+            `Request status changed to ${nextStatus}`,
+            existingRequest.id,
+          ),
+        ),
+      ).catch((error) => console.error("[Notifications] Request status trigger error:", error));
     }
 
-    return res.json(updatedRequest);
+    return res.json(formatRequest(updatedRequest));
   } catch (error) {
-    console.error('[Requests] Update error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("[Requests] Update error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
 export default router;
-
-
-

@@ -173,24 +173,12 @@ router.get('/me', requireAuth, async (req, res) => {
       where: { id: userId, deletedAt: null },
       include: {
         user: true,
-        currentPlan: true,
-        userPlans: {
-          where: {
-            isActive: true,
-            OR : [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-          },
-          orderBy: { startedAt: 'desc' },
-          take: 1,
-          include: { plan: true },
-        },
       },
     });
 
     if (!profile || !profile.user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    const activeSubscription = profile.userPlans?.[0];
 
     return res.json({
       user: {
@@ -212,32 +200,8 @@ router.get('/me', requireAuth, async (req, res) => {
         rating: profile.rating.toString(),
         isAdmin: profile.role === 'admin' || profile.role === 'super_admin',
         isSuperAdmin: profile.role === 'super_admin',
-        currentPlan: profile.currentPlan ? {
-          id: profile.currentPlan.id,
-          name: profile.currentPlan.name,
-          price: profile.currentPlan.price.toString(),
-          currency: profile.currentPlan.currency,
-          letterQuota: profile.currentPlan.letterQuota,
-        } : null,
-        subscription: activeSubscription
-          ? {
-            id: activeSubscription.id,
-            planId: activeSubscription.planId,
-            startedAt: activeSubscription.startedAt.toISOString(),
-            expiresAt: activeSubscription.expiresAt?.toISOString() ?? null,
-            lettersUsed: activeSubscription.lettersUsed,
-            audioMinutesUsed: activeSubscription.audioMinutesUsed,
-            plan: activeSubscription.plan
-              ? {
-                id: activeSubscription.plan.id,
-                name: activeSubscription.plan.name,
-                price: activeSubscription.plan.price.toString(),
-                currency: activeSubscription.plan.currency,
-                letterQuota: activeSubscription.plan.letterQuota,
-              }
-              : null,
-          }
-          : null,
+        currentPlan: null,
+        subscription: null,
         createdAt: profile.createdAt.toISOString(),
         updatedAt: profile.updatedAt.toISOString(),
       },

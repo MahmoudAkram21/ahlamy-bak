@@ -284,80 +284,9 @@ router.delete("/:id", requireAuth, async (req, res) => {
 });
 
 router.post("/subscribe", requireAuth, async (req, res) => {
-  try {
-    const userId = req.user!.userId;
-    const { planId } = req.body ?? {};
-
-    if (!planId) {
-      return res.status(400).json({ error: "planId is required" });
-    }
-
-    const plan = await prisma.plan.findFirst({ where: { id: planId, deletedAt: null } });
-
-    if (!plan) {
-      return res.status(404).json({ error: "Plan not found" });
-    }
-
-    // Note: Legacy subscription endpoint - plans are now purchased per-dream
-    // This endpoint is kept for backward compatibility but may not work as expected
-    // since plans no longer have durationDays
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1); // Default to 1 year
-
-    const subscription = await prisma.$transaction(async (tx) => {
-      const upserted = await tx.userPlan.upsert({
-        where: {
-          userId_planId: {
-            userId,
-            planId,
-          },
-        },
-        create: {
-          userId,
-          planId,
-          expiresAt,
-          isActive: true,
-          lettersUsed: 0,
-          audioMinutesUsed: 0,
-        },
-        update: {
-          expiresAt,
-          isActive: true,
-          lettersUsed: 0,
-          audioMinutesUsed: 0,
-        },
-        include: {
-          plan: true,
-        },
-      });
-
-      await tx.profile.update({
-        where: { id: userId },
-        data: { currentPlanId: planId },
-      });
-
-      await tx.payment.create({
-        data: {
-          userId,
-          planId,
-          amount: plan.price,
-          currency: plan.currency,
-          status: "succeeded",
-          provider: "manual",
-          reference: `SUB-${Date.now()}`,
-        },
-      });
-
-      return upserted;
-    });
-
-    return res.json({
-      subscription: { ...subscription, plan: formatPlan(subscription.plan) },
-    });
-  } catch (error) {
-    console.error("[Plans] Subscribe error:", error);
-    return res.status(500).json({ error: "Failed to subscribe to plan" });
-  }
+  return res.status(410).json({
+    error: "Plan subscriptions are no longer supported. Create a dream request and pay for that request instead.",
+  });
 });
 
 export default router;
