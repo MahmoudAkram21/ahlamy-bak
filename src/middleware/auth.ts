@@ -1,12 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import prisma from '../lib/prisma';
 import { verifyToken } from '../utils/auth';
 
 const SESSION_COOKIE_NAME = 'auth_token';
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  console.log(req.headers)
-  console.log(req.headers.authorization)
-
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const cookieToken = req.cookies?.[SESSION_COOKIE_NAME];
 
@@ -28,12 +26,40 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 
-  req.user = payload;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        deletedAt: true,
+        profile: {
+          select: {
+            role: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!user || user.deletedAt || !user.profile || user.profile.deletedAt) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    req.user = {
+      ...payload,
+      email: user.email,
+      role: user.profile.role,
+    };
+  } catch (error) {
+    console.error('[Auth] Token user lookup error:', error);
+    return res.status(500).json({ error: 'Authentication check failed' });
+  }
 
   return next();
 }
 
-export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const cookieToken = req.cookies?.[SESSION_COOKIE_NAME];
 
@@ -48,7 +74,31 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   if (token) {
     const payload = verifyToken(token);
     if (payload) {
-      req.user = payload;
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            email: true,
+            deletedAt: true,
+            profile: {
+              select: {
+                role: true,
+                deletedAt: true,
+              },
+            },
+          },
+        });
+
+        if (user && !user.deletedAt && user.profile && !user.profile.deletedAt) {
+          req.user = {
+            ...payload,
+            email: user.email,
+            role: user.profile.role,
+          };
+        }
+      } catch (error) {
+        console.error('[Auth] Optional token user lookup error:', error);
+      }
     }
   }
 

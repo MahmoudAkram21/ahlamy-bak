@@ -141,11 +141,20 @@ router.delete('/account', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.delete({
+    const deletedAt = new Date();
+    await prisma.$transaction([
+      prisma.profile.update({
         where: { id: userId },
-      });
-    });
+        data: {
+          isAvailable: false,
+          deletedAt,
+        },
+      }),
+      prisma.user.update({
+        where: { id: userId },
+        data: { deletedAt },
+      }),
+    ]);
 
     clearSessionCookie(res);
 

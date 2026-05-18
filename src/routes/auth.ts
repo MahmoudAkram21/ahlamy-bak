@@ -114,12 +114,12 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: { email, deletedAt: null },
       include: { profile: true },
     });
 
-    if (!user || !user.profile) {
+    if (!user || !user.profile || user.profile.deletedAt) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -169,8 +169,8 @@ router.post('/logout', (_req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: userId, deletedAt: null },
       include: {
         user: true,
         currentPlan: true,

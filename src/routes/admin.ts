@@ -9,8 +9,8 @@ import { normalizePlanName } from '../utils/planText';
 const router = Router();
 
 async function ensureRole(userId: string, roles: Array<'admin' | 'super_admin'>) {
-  const profile = await prisma.profile.findUnique({
-    where: { id: userId },
+  const profile = await prisma.profile.findFirst({
+    where: { id: userId, deletedAt: null },
     select: { role: true },
   });
 
@@ -79,6 +79,14 @@ const reviewSelect = Prisma.sql`
   FROM reviews
 `;
 
+const templateCategories = ['opening', 'closing', 'general'] as const;
+
+function normalizeTemplateCategory(value: unknown) {
+  return typeof value === 'string' && templateCategories.includes(value as any)
+    ? (value as (typeof templateCategories)[number])
+    : null;
+}
+
 function getMonthRange(monthValue: unknown) {
   const monthPattern = /^(\d{4})-(\d{2})$/;
   const now = new Date();
@@ -117,10 +125,10 @@ router.get('/stats', requireAuth, async (req, res) => {
     }
 
     const [totalUsers, totalRequests, completedRequests, totalPlans, totalRevenueAggregate] = await Promise.all([
-      prisma.profile.count(),
-      prisma.request.count(),
-      prisma.request.count({ where: { status: 'completed' } }),
-      prisma.plan.count(),
+      prisma.profile.count({ where: { deletedAt: null } }),
+      prisma.request.count({ where: { dream: { deletedAt: null } } }),
+      prisma.request.count({ where: { status: 'completed', dream: { deletedAt: null } } }),
+      prisma.plan.count({ where: { deletedAt: null } }),
       prisma.payment.aggregate({
         _sum: { amount: true },
         where: { status: 'succeeded' },
@@ -159,7 +167,7 @@ router.get('/interpreter-statistics', requireAuth, async (req, res) => {
 
     const [interpreters, plans, rows] = await Promise.all([
       prisma.profile.findMany({
-        where: { role: 'interpreter' },
+        where: { role: 'interpreter', deletedAt: null },
         orderBy: [{ isAvailable: 'desc' }, { fullName: 'asc' }],
         select: {
           id: true,
@@ -169,6 +177,7 @@ router.get('/interpreter-statistics', requireAuth, async (req, res) => {
         },
       }),
       prisma.plan.findMany({
+        where: { deletedAt: null },
         orderBy: { name: 'asc' },
         select: {
           id: true,
@@ -183,7 +192,8 @@ router.get('/interpreter-statistics', requireAuth, async (req, res) => {
           COUNT(*) AS requestCount
         FROM requests r
         INNER JOIN dreams d ON d.id = r.dream_id
-        WHERE r.status = 'completed'
+      WHERE r.status = 'completed'
+          AND d.deleted_at IS NULL
           AND r.interpreter_id IS NOT NULL
           AND COALESCE(r.completed_at, r.updated_at) >= ${startDate}
           AND COALESCE(r.completed_at, r.updated_at) < ${endDate}
@@ -344,7 +354,7 @@ router.get('/notifications', requireAuth, async (req, res) => {
         p.role AS userRole
       FROM notifications n
       INNER JOIN profiles p ON p.id = n.user_id
-      WHERE n.type = 'admin_broadcast'
+      WHERE n.type = 'admin_broadcast' AND p.deleted_at IS NULL
       ORDER BY n.created_at DESC
       LIMIT 100
     `);
@@ -393,7 +403,7 @@ router.post('/notifications/broadcast', requireAuth, async (req, res) => {
 
     const roles = notificationAudienceRoles[audience as keyof typeof notificationAudienceRoles];
     const recipients = await prisma.profile.findMany({
-      where: { role: { in: [...roles] } },
+      where: { role: { in: [...roles] }, deletedAt: null },
       select: { id: true },
     });
 
@@ -405,13 +415,183 @@ router.post('/notifications/broadcast', requireAuth, async (req, res) => {
       INSERT INTO notifications (id, user_id, type, message, is_read, reference_id, created_at)
       SELECT UUID(), id, 'admin_broadcast', ${normalizedMessage}, false, NULL, NOW(3)
       FROM profiles
-      WHERE role IN (${Prisma.join([...roles])})
+      WHERE role IN (${Prisma.join([...roles])}) AND deleted_at IS NULL
     `);
 
     return res.status(201).json({ count: recipients.length });
   } catch (error) {
     console.error('[Admin] Notification broadcast error:', error);
     return res.status(500).json({ error: 'Failed to send notifications' });
+  }
+});
+
+router.get('/message-templates', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    const templates = await prisma.interpreterMessageTemplate.findMany({
+      orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    return res.json({ templates });
+  } catch (error) {
+    console.error('[Admin] Message templates fetch error:', error);
+    return res.status(500).json({ error: 'Failed to fetch message templates' });
+  }
+});
+
+router.post('/message-templates', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    const category = normalizeTemplateCategory(req.body?.category);
+    const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+    const isActive = req.body?.isActive === undefined ? true : Boolean(req.body.isActive);
+
+    if (!category) {
+      return res.status(400).json({ error: 'Invalid template category' });
+    }
+
+    if (!content) {
+      return res.status(400).json({ error: 'Template content is required' });
+    }
+
+    const lastTemplate = await prisma.interpreterMessageTemplate.findFirst({
+      where: { category },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const template = await prisma.interpreterMessageTemplate.create({
+      data: {
+        category,
+        content,
+        isActive,
+        sortOrder: (lastTemplate?.sortOrder ?? -1) + 1,
+      },
+    });
+
+    return res.status(201).json({ template });
+  } catch (error) {
+    console.error('[Admin] Message template create error:', error);
+    return res.status(500).json({ error: 'Failed to create message template' });
+  }
+});
+
+router.patch('/message-templates/:id', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    const updateData: Record<string, unknown> = {};
+
+    if (req.body?.category !== undefined) {
+      const category = normalizeTemplateCategory(req.body.category);
+      if (!category) return res.status(400).json({ error: 'Invalid template category' });
+      updateData.category = category;
+    }
+
+    if (req.body?.content !== undefined) {
+      const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+      if (!content) return res.status(400).json({ error: 'Template content is required' });
+      updateData.content = content;
+    }
+
+    if (req.body?.isActive !== undefined) {
+      updateData.isActive = Boolean(req.body.isActive);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No valid updates provided' });
+    }
+
+    const template = await prisma.interpreterMessageTemplate.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    return res.json({ template });
+  } catch (error) {
+    console.error('[Admin] Message template update error:', error);
+    return res.status(500).json({ error: 'Failed to update message template' });
+  }
+});
+
+router.post('/message-templates/:id/move', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    const direction = req.body?.direction === 'down' ? 'down' : 'up';
+    const current = await prisma.interpreterMessageTemplate.findUnique({ where: { id: req.params.id } });
+
+    if (!current) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    const swap = await prisma.interpreterMessageTemplate.findFirst({
+      where: {
+        category: current.category,
+        sortOrder: direction === 'up' ? { lt: current.sortOrder } : { gt: current.sortOrder },
+      },
+      orderBy: { sortOrder: direction === 'up' ? 'desc' : 'asc' },
+    });
+
+    if (!swap) {
+      return res.json({ template: current });
+    }
+
+    await prisma.$transaction([
+      prisma.interpreterMessageTemplate.update({
+        where: { id: current.id },
+        data: { sortOrder: swap.sortOrder },
+      }),
+      prisma.interpreterMessageTemplate.update({
+        where: { id: swap.id },
+        data: { sortOrder: current.sortOrder },
+      }),
+    ]);
+
+    const template = await prisma.interpreterMessageTemplate.findUnique({ where: { id: current.id } });
+    return res.json({ template });
+  } catch (error) {
+    console.error('[Admin] Message template move error:', error);
+    return res.status(500).json({ error: 'Failed to move message template' });
+  }
+});
+
+router.delete('/message-templates/:id', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const isAdmin = await ensureRole(userId, ['admin', 'super_admin']);
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
+    await prisma.interpreterMessageTemplate.delete({ where: { id: req.params.id } });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Admin] Message template delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete message template' });
   }
 });
 
@@ -595,6 +775,7 @@ router.get('/users', requireAuth, async (req, res) => {
     }
 
     const users = await prisma.profile.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -766,8 +947,8 @@ router.patch('/users/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden - Super admin access required' });
     }
 
-    const existingProfile = await prisma.profile.findUnique({
-      where: { id: targetId },
+    const existingProfile = await prisma.profile.findFirst({
+      where: { id: targetId, deletedAt: null },
     });
 
     if (!existingProfile) {
@@ -881,8 +1062,8 @@ router.delete('/users/:id', requireAuth, async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id: targetId },
+    const existingUser = await prisma.user.findFirst({
+      where: { id: targetId, deletedAt: null },
       include: { profile: true },
     });
 
@@ -890,10 +1071,20 @@ router.delete('/users/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Delete user (cascade will delete profile and related records)
-    await prisma.user.delete({
-      where: { id: targetId },
-    });
+    const deletedAt = new Date();
+    await prisma.$transaction([
+      prisma.profile.update({
+        where: { id: targetId },
+        data: {
+          isAvailable: false,
+          deletedAt,
+        },
+      }),
+      prisma.user.update({
+        where: { id: targetId },
+        data: { deletedAt },
+      }),
+    ]);
 
     console.log(`[Admin] Deleted user: ${existingUser.email}`);
 
@@ -921,7 +1112,7 @@ router.get('/interpreters', requireAuth, async (req, res) => {
     }
 
     const interpreters = await prisma.profile.findMany({
-      where: { role: 'interpreter' },
+      where: { role: 'interpreter', deletedAt: null },
       orderBy: [
         { isAvailable: 'desc' },
         { totalInterpretations: 'desc' },

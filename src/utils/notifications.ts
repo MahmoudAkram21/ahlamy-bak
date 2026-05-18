@@ -27,6 +27,7 @@ export async function createNotificationsForAdmins(
   const admins = await prisma.profile.findMany({
     where: {
       role: { in: ["admin", "super_admin"] },
+      deletedAt: null,
       id: excludeUserId ? { not: excludeUserId } : undefined,
     },
     select: { id: true },

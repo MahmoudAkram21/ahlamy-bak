@@ -5,6 +5,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
+import http from "http";
 
 import authRouter from "./routes/auth";
 import profileRouter from "./routes/profile";
@@ -21,6 +22,7 @@ import adminPagesRouter from "./routes/admin-pages";
 import pagesRouter from "./routes/pages";
 import reviewsRouter from "./routes/reviews";
 import { getDefaultCorsOrigins } from "./config/urls";
+import { attachSocketServer } from "./lib/socket";
 
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
 
@@ -158,8 +160,10 @@ app.use(
 );
 
 const port = Number(process.env.PORT) || 5000;
+const server = http.createServer(app);
+attachSocketServer(server, allowedOrigins, allowedOriginPatterns);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`\n🚀 Mubasharat Backend Server`);
   console.log(`📍 Running on: http://localhost:${port}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);

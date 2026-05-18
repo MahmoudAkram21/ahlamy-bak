@@ -59,6 +59,8 @@ function formatPlan(plan: any) {
     scope: plan.scope,
     countryCodes: parseCountryCodes(plan.countryCodes),
     isActive: plan.isActive,
+    supportsVoiceNotes: Boolean(plan.supportsVoiceNotes),
+    voiceNoteMaxSeconds: plan.voiceNoteMaxSeconds,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };
@@ -74,7 +76,7 @@ router.get("/", optionalAuth, async (req, res) => {
       requesterRole === "admin" || requesterRole === "super_admin";
 
     const plans = await prisma.plan.findMany({
-      where: includeInactive && isElevated ? {} : { isActive: true },
+      where: includeInactive && isElevated ? { deletedAt: null } : { isActive: true, deletedAt: null },
       orderBy: { price: "asc" },
     });
 
@@ -105,6 +107,8 @@ router.post("/", requireAuth, async (req, res) => {
       scope = "egypt",
       countryCodes = [],
       isActive = true,
+      supportsVoiceNotes = false,
+      voiceNoteMaxSeconds,
     } = req.body ?? {};
 
     if (!name || typeof name !== "string") {
@@ -130,6 +134,14 @@ router.post("/", requireAuth, async (req, res) => {
 
     const normalizedCountryCodes =
       normalizedScope === "custom" ? parseCountryCodes(countryCodes) : [];
+    const normalizedVoiceMax =
+      voiceNoteMaxSeconds === undefined || voiceNoteMaxSeconds === null || voiceNoteMaxSeconds === ""
+        ? null
+        : Number(voiceNoteMaxSeconds);
+
+    if (Boolean(supportsVoiceNotes) && (normalizedVoiceMax === null || !Number.isFinite(normalizedVoiceMax) || normalizedVoiceMax <= 0)) {
+      return res.status(400).json({ error: "voiceNoteMaxSeconds is required when voice notes are enabled" });
+    }
 
     const plan = await prisma.plan.create({
       data: {
@@ -142,6 +154,8 @@ router.post("/", requireAuth, async (req, res) => {
         scope: normalizedScope,
         countryCodes: normalizedCountryCodes,
         isActive: Boolean(isActive),
+        supportsVoiceNotes: Boolean(supportsVoiceNotes),
+        voiceNoteMaxSeconds: Boolean(supportsVoiceNotes) ? normalizedVoiceMax : null,
       },
     });
 
@@ -162,7 +176,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
 
     const { id } = req.params;
 
-    const existingPlan = await prisma.plan.findUnique({ where: { id } });
+    const existingPlan = await prisma.plan.findFirst({ where: { id, deletedAt: null } });
 
     if (!existingPlan) {
       return res.status(404).json({ error: "Plan not found" });
@@ -178,6 +192,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
       scope,
       countryCodes,
       isActive,
+      supportsVoiceNotes,
+      voiceNoteMaxSeconds,
     } = req.body ?? {};
 
     const updateData: Record<string, unknown> = {};
@@ -207,6 +223,22 @@ router.patch("/:id", requireAuth, async (req, res) => {
       updateData.countryCodes = nextScope === "custom" ? parseCountryCodes(countryCodes) : [];
     }
     if (isActive !== undefined) updateData.isActive = Boolean(isActive);
+    if (supportsVoiceNotes !== undefined) {
+      updateData.supportsVoiceNotes = Boolean(supportsVoiceNotes);
+      if (!Boolean(supportsVoiceNotes) && voiceNoteMaxSeconds === undefined) {
+        updateData.voiceNoteMaxSeconds = null;
+      }
+    }
+    if (voiceNoteMaxSeconds !== undefined) {
+      updateData.voiceNoteMaxSeconds =
+        voiceNoteMaxSeconds === null || voiceNoteMaxSeconds === "" ? null : Number(voiceNoteMaxSeconds);
+    }
+
+    const nextSupportsVoice = (updateData.supportsVoiceNotes ?? existingPlan.supportsVoiceNotes) as boolean;
+    const nextVoiceMax = (updateData.voiceNoteMaxSeconds ?? existingPlan.voiceNoteMaxSeconds) as number | null;
+    if (nextSupportsVoice && (!Number.isFinite(Number(nextVoiceMax)) || Number(nextVoiceMax) <= 0)) {
+      return res.status(400).json({ error: "voiceNoteMaxSeconds is required when voice notes are enabled" });
+    }
 
     const plan = await prisma.plan.update({
       where: { id },
@@ -230,26 +262,19 @@ router.delete("/:id", requireAuth, async (req, res) => {
 
     const { id } = req.params;
 
-    const existingPlan = await prisma.plan.findUnique({ where: { id } });
+    const existingPlan = await prisma.plan.findFirst({ where: { id, deletedAt: null } });
 
     if (!existingPlan) {
       return res.status(404).json({ error: "Plan not found" });
     }
 
-    const [payments, dreams, userPlans, dreamPurchases] = await Promise.all([
-      prisma.payment.count({ where: { planId: id } }),
-      prisma.dream.count({ where: { planId: id } }),
-      prisma.userPlan.count({ where: { planId: id } }),
-      prisma.dreamPlanPurchase.count({ where: { planId: id } }),
-    ]);
-
-    if (payments || dreams || userPlans || dreamPurchases) {
-      return res.status(409).json({
-        error: "Plan has related records. Deactivate it instead of deleting it.",
-      });
-    }
-
-    await prisma.plan.delete({ where: { id } });
+    await prisma.plan.update({
+      where: { id },
+      data: {
+        isActive: false,
+        deletedAt: new Date(),
+      },
+    });
 
     return res.json({ success: true });
   } catch (error) {
@@ -267,7 +292,7 @@ router.post("/subscribe", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "planId is required" });
     }
 
-    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    const plan = await prisma.plan.findFirst({ where: { id: planId, deletedAt: null } });
 
     if (!plan) {
       return res.status(404).json({ error: "Plan not found" });

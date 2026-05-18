@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     }
 
     const comments = await prisma.comment.findMany({
-      where: { dreamId },
+      where: { dreamId, dream: { deletedAt: null } },
       include: {
         user: {
           select: {
@@ -41,6 +41,15 @@ router.post('/', requireAuth, async (req, res) => {
 
     if (!dream_id || !content) {
       return res.status(400).json({ error: 'dream_id and content are required' });
+    }
+
+    const dream = await prisma.dream.findFirst({
+      where: { id: dream_id, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: 'Dream not found' });
     }
 
     const comment = await prisma.comment.create({

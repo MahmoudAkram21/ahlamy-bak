@@ -152,6 +152,26 @@ async function upsertInterpreterApplication(application) {
   `;
 }
 
+async function upsertInterpreterMessageTemplate(template) {
+  const id = template.id || `seed-template-${template.category}-${template.sortOrder}`;
+  return prisma.interpreterMessageTemplate.upsert({
+    where: { id },
+    update: {
+      category: template.category,
+      content: template.content,
+      sortOrder: template.sortOrder,
+      isActive: template.isActive ?? true,
+    },
+    create: {
+      id,
+      category: template.category,
+      content: template.content,
+      sortOrder: template.sortOrder,
+      isActive: template.isActive ?? true,
+    },
+  });
+}
+
 async function upsertReview(review) {
   await prisma.$executeRaw`
     INSERT INTO reviews (
@@ -199,6 +219,8 @@ async function main() {
     scope: "egypt",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: false,
+    voiceNoteMaxSeconds: null,
   });
 
   const basicPlan = await upsertPlan({
@@ -211,6 +233,8 @@ async function main() {
     scope: "egypt",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: true,
+    voiceNoteMaxSeconds: 60,
   });
 
   const proPlan = await upsertPlan({
@@ -223,6 +247,8 @@ async function main() {
     scope: "egypt",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: true,
+    voiceNoteMaxSeconds: 120,
   });
 
   const premiumPlan = await upsertPlan({
@@ -235,6 +261,8 @@ async function main() {
     scope: "international",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: true,
+    voiceNoteMaxSeconds: 120,
   });
 
   const internationalBasicPlan = await upsertPlan({
@@ -247,6 +275,8 @@ async function main() {
     scope: "international",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: false,
+    voiceNoteMaxSeconds: null,
   });
 
   const internationalProPlan = await upsertPlan({
@@ -259,6 +289,8 @@ async function main() {
     scope: "international",
     countryCodes: [],
     isActive: true,
+    supportsVoiceNotes: true,
+    voiceNoteMaxSeconds: 90,
   });
 
   const archivedPlan = await upsertPlan({
@@ -271,7 +303,33 @@ async function main() {
     scope: "egypt",
     countryCodes: [],
     isActive: false,
+    supportsVoiceNotes: false,
+    voiceNoteMaxSeconds: null,
   });
+
+  console.log("Creating interpreter message templates...");
+  await Promise.all([
+    upsertInterpreterMessageTemplate({
+      category: "opening",
+      content: "السلام عليكم ورحمة الله وبركاته، شكرًا لك على مشاركة رؤياك. سأقرأ التفاصيل بعناية ثم أبدأ بالرد عليك.",
+      sortOrder: 0,
+    }),
+    upsertInterpreterMessageTemplate({
+      category: "opening",
+      content: "مرحبًا بك، وصلتني الرؤيا وسأطرح عليك أي سؤال توضيحي إذا احتجت قبل التفسير.",
+      sortOrder: 1,
+    }),
+    upsertInterpreterMessageTemplate({
+      category: "general",
+      content: "هل يمكنك توضيح هذا الجزء من الرؤيا بمزيد من التفاصيل؟",
+      sortOrder: 0,
+    }),
+    upsertInterpreterMessageTemplate({
+      category: "closing",
+      content: "هذا ما ظهر لي في تفسير الرؤيا، والله أعلم. إذا احتجت أي توضيح إضافي فأخبرني.",
+      sortOrder: 0,
+    }),
+  ]);
 
   console.log("Creating users...");
   await upsertUser({

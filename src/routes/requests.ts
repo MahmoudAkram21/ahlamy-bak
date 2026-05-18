@@ -9,8 +9,8 @@ router.get('/', requireAuth, async (req, res) => {
   try {
     const userId = req.user!.userId;
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { role: true },
     });
 
@@ -18,9 +18,10 @@ router.get('/', requireAuth, async (req, res) => {
 
     const requests = await prisma.request.findMany({
       where: isAdmin
-        ? {}
+        ? { dream: { deletedAt: null } }
         : {
             OR: [{ dreamerId: userId }, { interpreterId: userId }],
+            dream: { deletedAt: null },
           },
       include: {
         dream: {
@@ -29,6 +30,14 @@ router.get('/', requireAuth, async (req, res) => {
             title: true,
             content: true,
             status: true,
+            plan: {
+              select: {
+                id: true,
+                letterQuota: true,
+                supportsVoiceNotes: true,
+                voiceNoteMaxSeconds: true,
+              },
+            },
           },
         },
         dreamer: {
@@ -67,6 +76,19 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'dream_id and title are required' });
     }
 
+    const dream = await prisma.dream.findFirst({
+      where: { id: dream_id, deletedAt: null },
+      select: { id: true, dreamerId: true },
+    });
+
+    if (!dream) {
+      return res.status(404).json({ error: 'Dream not found' });
+    }
+
+    if (dream.dreamerId !== userId) {
+      return res.status(403).json({ error: 'You can only create requests for your own dreams' });
+    }
+
     const newRequest = await prisma.request.create({
       data: {
         dreamId: dream_id,
@@ -77,14 +99,7 @@ router.post('/', requireAuth, async (req, res) => {
         status: 'open',
       },
       include: {
-        dream: {
-          select: {
-            id: true,
-            title: true,
-            content: true,
-            status: true,
-          },
-        },
+        dream: true,
         dreamer: {
           select: {
             id: true,
@@ -108,10 +123,21 @@ router.get('/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
     const userId = req.user!.userId;
 
-    const requestData = await prisma.request.findUnique({
-      where: { id },
+    const requestData = await prisma.request.findFirst({
+      where: { id, dream: { deletedAt: null } },
       include: {
-        dream: true,
+        dream: {
+          include: {
+            plan: {
+              select: {
+                id: true,
+                letterQuota: true,
+                supportsVoiceNotes: true,
+                voiceNoteMaxSeconds: true,
+              },
+            },
+          },
+        },
         dreamer: {
           select: {
             id: true,
@@ -133,8 +159,8 @@ router.get('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { role: true },
     });
 
@@ -162,8 +188,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
     const requesterId = req.user!.userId;
     const { status, interpreterId } = req.body ?? {};
 
-    const existingRequest = await prisma.request.findUnique({
-      where: { id },
+    const existingRequest = await prisma.request.findFirst({
+      where: { id, dream: { deletedAt: null } },
       select: {
         dreamerId: true,
         interpreterId: true,
@@ -175,8 +201,8 @@ router.patch('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: requesterId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: requesterId, deletedAt: null },
       select: { role: true },
     });
 
@@ -196,7 +222,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
       }
     }
 
-    if (status && !isSuperAdmin && !isDreamer && !isInterpreter) {
+    const isClosingOrReopening = status === 'closed' || (existingRequest.status === 'closed' && status === 'in_progress');
+    if (isClosingOrReopening && !isSuperAdmin && !isAdmin && !isInterpreter) {
+      return res.status(403).json({ error: 'Only the assigned interpreter or an admin can close or reopen requests' });
+    }
+
+    if (status && !isClosingOrReopening && !isSuperAdmin && !isDreamer && !isInterpreter) {
       return res.status(403).json({ error: 'Only the dreamer, assigned interpreter, or super admin can update status' });
     }
 
@@ -221,7 +252,18 @@ router.patch('/:id', requireAuth, async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        dream: true,
+        dream: {
+          include: {
+            plan: {
+              select: {
+                id: true,
+                letterQuota: true,
+                supportsVoiceNotes: true,
+                voiceNoteMaxSeconds: true,
+              },
+            },
+          },
+        },
         dreamer: {
           select: {
             id: true,

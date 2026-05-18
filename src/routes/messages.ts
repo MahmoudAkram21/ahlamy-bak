@@ -17,14 +17,14 @@ router.get('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'dream_id is required' });
     }
 
-    const dream = await prisma.dream.findUnique({ where: { id: dreamId } });
+    const dream = await prisma.dream.findFirst({ where: { id: dreamId, deletedAt: null } });
 
     if (!dream) {
       return res.status(404).json({ error: 'Dream not found' });
     }
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: userId },
+    const profile = await prisma.profile.findFirst({
+      where: { id: userId, deletedAt: null },
       select: { role: true },
     });
 
@@ -92,8 +92,8 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Either content or audio is required' });
     }
 
-    const dream = await prisma.dream.findUnique({
-      where: { id: dream_id },
+    const dream = await prisma.dream.findFirst({
+      where: { id: dream_id, deletedAt: null },
       select: {
         id: true,
         dreamerId: true,
