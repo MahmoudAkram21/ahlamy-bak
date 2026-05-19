@@ -335,6 +335,7 @@ enum NotificationType {
 
 enum InterpreterApplicationStatus {
   pending
+  resubmitted
   approved
   rejected
 }

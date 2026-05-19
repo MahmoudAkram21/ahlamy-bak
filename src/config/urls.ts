@@ -1,7 +1,8 @@
-const productionAppBaseUrl = "https://ahlamy.nodeteam.site";
+const productionAppBaseUrl = "https://ahlamy.site";
 const productionDashboardBaseUrl = "https://ahlamy-dashboard.vercel.app";
 const developmentAppBaseUrl = "http://localhost:3000";
 const developmentDashboardBaseUrl = "http://localhost:5173";
+const localFrontendOrigins = ["http://localhost:3000", "http://localhost:3001"];
 
 const trimTrailingSlash = (value: string) => value.replace(/\/$/, "");
 
@@ -20,8 +21,19 @@ export const dashboardBaseUrl = trimTrailingSlash(
 
 export function getDefaultCorsOrigins() {
   const origins = isProduction
-    ? [appBaseUrl, dashboardBaseUrl]
-    : [appBaseUrl, dashboardBaseUrl, "http://localhost:5174"];
+    ? [
+        appBaseUrl,
+        dashboardBaseUrl,
+        "https://ahlamy.site",
+        "https://www.ahlamy.site",
+        "https://ahlamy.nodeteam.site",
+        ...localFrontendOrigins,
+      ]
+    : [appBaseUrl, dashboardBaseUrl, "http://localhost:5174", ...localFrontendOrigins];
 
   return Array.from(new Set(origins.map(trimTrailingSlash)));
+}
+
+export function getDefaultCorsOriginPatterns() {
+  return isProduction ? [/^https:\/\/([a-z0-9-]+\.)?ahlamy\.site$/] : [];
 }

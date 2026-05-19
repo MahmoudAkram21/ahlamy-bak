@@ -19,7 +19,7 @@ import adminRouter from "./routes/admin";
 import adminPagesRouter from "./routes/admin-pages";
 import pagesRouter from "./routes/pages";
 import reviewsRouter from "./routes/reviews";
-import { getDefaultCorsOrigins } from "./config/urls";
+import { getDefaultCorsOriginPatterns, getDefaultCorsOrigins } from "./config/urls";
 import { attachSocketServer } from "./lib/socket";
 
 dotenv.config({ path: process.env.BACKEND_ENV_PATH || ".env" });
@@ -47,7 +47,12 @@ const parseCsvEnv = (value: string | undefined) =>
     .filter(Boolean);
 
 const allowedOrigins = parseCsvEnv(process.env.CORS_ORIGINS || getDefaultCorsOrigins().join(","));
-const allowedOriginPatterns = parseCsvEnv(process.env.CORS_ORIGIN_PATTERNS)
+const configuredOriginPatterns = parseCsvEnv(process.env.CORS_ORIGIN_PATTERNS);
+const allowedOriginPatterns = (
+  configuredOriginPatterns.length > 0
+    ? configuredOriginPatterns
+    : getDefaultCorsOriginPatterns().map((pattern) => pattern.source)
+)
   .map((pattern) => {
     try {
       return new RegExp(pattern);

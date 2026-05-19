@@ -2,7 +2,8 @@ import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
 import { Prisma } from '@prisma/client';
-import { hashPassword } from '../utils/auth';
+import { generateTemporaryPassword, hashPassword } from '../utils/auth';
+import { sendInterpreterApprovalEmail } from '../utils/email';
 import { normalizeReviewText } from '../utils/reviewText';
 import { normalizePlanName } from '../utils/planText';
 
@@ -606,7 +607,7 @@ router.get('/interpreter-applications', requireAuth, async (req, res) => {
 
     const applications = await prisma.$queryRaw<any[]>(Prisma.sql`
       ${interpreterApplicationSelect}
-      ORDER BY status ASC, created_at DESC
+      ORDER BY FIELD(status, 'pending', 'resubmitted', 'rejected', 'approved'), created_at DESC
       LIMIT 250
     `);
 
@@ -628,48 +629,129 @@ router.patch('/interpreter-applications/:id', requireAuth, async (req, res) => {
 
     const { id } = req.params;
     const { status, notes } = req.body ?? {};
-    const updateData: Record<string, unknown> = {};
 
     if (status !== undefined) {
-      if (!['pending', 'approved', 'rejected'].includes(status)) {
+      if (!['pending', 'resubmitted', 'approved', 'rejected'].includes(status)) {
         return res.status(400).json({ error: 'Invalid application status' });
       }
-      updateData.status = status;
-      updateData.reviewedAt = status === 'pending' ? null : new Date();
     }
 
     if (notes !== undefined) {
       if (notes !== null && typeof notes !== 'string') {
         return res.status(400).json({ error: 'notes must be a string or null' });
       }
-      updateData.notes = notes;
     }
 
-    if (Object.keys(updateData).length === 0) {
+    if (status === undefined && notes === undefined) {
       return res.status(400).json({ error: 'No valid updates provided' });
     }
 
-    const updates: Prisma.Sql[] = [];
-
-    if (Object.prototype.hasOwnProperty.call(updateData, 'status')) {
-      updates.push(Prisma.sql`status = ${updateData.status as string}`);
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updateData, 'reviewedAt')) {
-      updates.push(Prisma.sql`reviewed_at = ${updateData.reviewedAt as Date | null}`);
-    }
-
-    if (Object.prototype.hasOwnProperty.call(updateData, 'notes')) {
-      updates.push(Prisma.sql`notes = ${updateData.notes as string | null}`);
-    }
-
-    updates.push(Prisma.sql`updated_at = ${new Date()}`);
-
-    await prisma.$executeRaw(Prisma.sql`
-      UPDATE interpreter_applications
-      SET ${Prisma.join(updates)}
+    const [existingApplication] = await prisma.$queryRaw<any[]>(Prisma.sql`
+      ${interpreterApplicationSelect}
       WHERE id = ${id}
+      LIMIT 1
     `);
+
+    if (!existingApplication) {
+      return res.status(404).json({ error: 'Interpreter application not found' });
+    }
+
+    let emailDelivery: Awaited<ReturnType<typeof sendInterpreterApprovalEmail>> | null = null;
+    let temporaryPassword: string | undefined;
+
+    if (status === 'approved' && existingApplication.status !== 'approved') {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: existingApplication.email },
+        include: { profile: true },
+      });
+
+      if (existingUser && existingUser.profile?.role !== 'interpreter') {
+        return res.status(409).json({ error: 'A non-interpreter user already exists with this email' });
+      }
+
+      if (!existingUser) {
+        temporaryPassword = generateTemporaryPassword();
+        const hashedPassword = await hashPassword(temporaryPassword);
+
+        await prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              email: existingApplication.email,
+              password: hashedPassword,
+            },
+          });
+
+          await tx.profile.create({
+            data: {
+              id: user.id,
+              email: user.email,
+              fullName: existingApplication.fullName,
+              role: 'interpreter',
+              city: existingApplication.city,
+              countryCode: existingApplication.countryCode,
+              isAvailable: true,
+            },
+          });
+
+          const updates: Prisma.Sql[] = [
+            Prisma.sql`status = 'approved'`,
+            Prisma.sql`reviewed_at = ${new Date()}`,
+            Prisma.sql`updated_at = ${new Date()}`,
+          ];
+
+          if (notes !== undefined) {
+            updates.push(Prisma.sql`notes = ${notes as string | null}`);
+          }
+
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE interpreter_applications
+            SET ${Prisma.join(updates)}
+            WHERE id = ${id}
+          `);
+        });
+
+        emailDelivery = await sendInterpreterApprovalEmail({
+          to: existingApplication.email,
+          fullName: existingApplication.fullName,
+          temporaryPassword,
+        });
+      } else {
+        const updates: Prisma.Sql[] = [
+          Prisma.sql`status = 'approved'`,
+          Prisma.sql`reviewed_at = ${new Date()}`,
+          Prisma.sql`updated_at = ${new Date()}`,
+        ];
+
+        if (notes !== undefined) {
+          updates.push(Prisma.sql`notes = ${notes as string | null}`);
+        }
+
+        await prisma.$executeRaw(Prisma.sql`
+          UPDATE interpreter_applications
+          SET ${Prisma.join(updates)}
+          WHERE id = ${id}
+        `);
+      }
+    } else {
+      const updates: Prisma.Sql[] = [];
+
+      if (status !== undefined) {
+        updates.push(Prisma.sql`status = ${status as string}`);
+        updates.push(Prisma.sql`reviewed_at = ${status === 'pending' || status === 'resubmitted' ? null : new Date()}`);
+      }
+
+      if (notes !== undefined) {
+        updates.push(Prisma.sql`notes = ${notes as string | null}`);
+      }
+
+      updates.push(Prisma.sql`updated_at = ${new Date()}`);
+
+      await prisma.$executeRaw(Prisma.sql`
+        UPDATE interpreter_applications
+        SET ${Prisma.join(updates)}
+        WHERE id = ${id}
+      `);
+    }
 
     const [application] = await prisma.$queryRaw<any[]>(Prisma.sql`
       ${interpreterApplicationSelect}
@@ -677,11 +759,11 @@ router.patch('/interpreter-applications/:id', requireAuth, async (req, res) => {
       LIMIT 1
     `);
 
-    if (!application) {
-      return res.status(404).json({ error: 'Interpreter application not found' });
-    }
-
-    return res.json({ application: formatInterpreterApplication(application) });
+    return res.json({
+      application: formatInterpreterApplication(application),
+      emailDelivery,
+      ...(temporaryPassword && process.env.NODE_ENV !== 'production' ? { temporaryPassword } : {}),
+    });
   } catch (error) {
     console.error('[Admin] Interpreter application update error:', error);
     return res.status(500).json({ error: 'Failed to update interpreter application' });

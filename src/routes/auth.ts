@@ -3,6 +3,7 @@ import prisma from '../lib/prisma';
 import { hashPassword, verifyPassword, generateToken } from '../utils/auth';
 import { setSessionCookie, clearSessionCookie } from '../utils/session';
 import { requireAuth } from '../middleware/auth';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -16,6 +17,38 @@ const normalizeRequiredString = (value: unknown) =>
 const normalizeCountryCode = (value: unknown) =>
   normalizeRequiredString(value).toUpperCase();
 
+function normalizeEmail(value: unknown) {
+  return normalizeRequiredString(value).toLowerCase();
+}
+
+function formatInterpreterApplication(application: any) {
+  return {
+    id: application.id,
+    fullName: application.fullName,
+    email: application.email,
+    city: application.city,
+    countryCode: application.countryCode,
+    status: application.status,
+    reviewedAt: application.reviewedAt,
+    createdAt: application.createdAt,
+    updatedAt: application.updatedAt,
+  };
+}
+
+const interpreterApplicationSelect = Prisma.sql`
+  SELECT
+    id,
+    full_name AS fullName,
+    email,
+    city,
+    country_code AS countryCode,
+    status,
+    reviewed_at AS reviewedAt,
+    created_at AS createdAt,
+    updated_at AS updatedAt
+  FROM interpreter_applications
+`;
+
 router.post('/register', async (req, res) => {
   try {
     const {
@@ -26,11 +59,13 @@ router.post('/register', async (req, res) => {
       city: rawCity,
       countryCode: rawCountryCode,
     } = req.body ?? {};
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedFullName = normalizeRequiredString(fullName);
     const city = normalizeRequiredString(rawCity);
     const countryCode = normalizeCountryCode(rawCountryCode);
 
-    if (!email || !password || !fullName || !city || !countryCode) {
-      return res.status(400).json({ error: 'Email, password, full name, city, and country code are required' });
+    if (!normalizedEmail || !normalizedFullName || !city || !countryCode) {
+      return res.status(400).json({ error: 'Email, full name, city, and country code are required' });
     }
 
     if (!/^[A-Z]{2}$/.test(countryCode)) {
@@ -41,9 +76,89 @@ router.post('/register', async (req, res) => {
       return res.status(403).json({ error: 'You are not allowed to register with this role' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return res.status(409).json({ error: 'User with this email already exists' });
+    }
+
+    if (role === 'interpreter') {
+      const [existingApplication] = await prisma.$queryRaw<any[]>(Prisma.sql`
+        ${interpreterApplicationSelect}
+        WHERE email = ${normalizedEmail}
+        LIMIT 1
+      `);
+
+      if (existingApplication) {
+        if (existingApplication.status === 'rejected') {
+          await prisma.$executeRaw(Prisma.sql`
+            UPDATE interpreter_applications
+            SET
+              full_name = ${normalizedFullName},
+              city = ${city},
+              country_code = ${countryCode},
+              status = 'resubmitted',
+              notes = NULL,
+              reviewed_at = NULL,
+              updated_at = ${new Date()}
+            WHERE id = ${existingApplication.id}
+          `);
+
+          const [application] = await prisma.$queryRaw<any[]>(Prisma.sql`
+            ${interpreterApplicationSelect}
+            WHERE id = ${existingApplication.id}
+            LIMIT 1
+          `);
+
+          return res.status(202).json({
+            application: formatInterpreterApplication(application),
+            message: 'Interpreter registration request resubmitted and is pending admin approval',
+          });
+        }
+
+        if (existingApplication.status === 'approved') {
+          return res.status(409).json({ error: 'This interpreter application has already been approved' });
+        }
+
+        return res.status(409).json({ error: 'Interpreter registration request is already pending review' });
+      }
+
+      await prisma.$executeRaw(Prisma.sql`
+        INSERT INTO interpreter_applications (
+          id,
+          full_name,
+          email,
+          city,
+          country_code,
+          status,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          UUID(),
+          ${normalizedFullName},
+          ${normalizedEmail},
+          ${city},
+          ${countryCode},
+          'pending',
+          ${new Date()},
+          ${new Date()}
+        )
+      `);
+
+      const [application] = await prisma.$queryRaw<any[]>(Prisma.sql`
+        ${interpreterApplicationSelect}
+        WHERE email = ${normalizedEmail}
+        LIMIT 1
+      `);
+
+      return res.status(202).json({
+        application: formatInterpreterApplication(application),
+        message: 'Interpreter registration request submitted and is pending admin approval',
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -51,7 +166,7 @@ router.post('/register', async (req, res) => {
     const { user, profile } = await prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           password: hashedPassword,
         },
       });
@@ -60,7 +175,7 @@ router.post('/register', async (req, res) => {
         data: {
           id: createdUser.id,
           email: createdUser.email,
-          fullName,
+          fullName: normalizedFullName,
           role,
           city,
           countryCode,
@@ -158,6 +273,46 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('[Auth] Login error:', error);
     return res.status(500).json({ error: 'Failed to authenticate user' });
+  }
+});
+
+router.patch('/change-password', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { currentPassword, newPassword } = req.body ?? {};
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: { id: true, password: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const isValidPassword = await verifyPassword(currentPassword, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('[Auth] Change password error:', error);
+    return res.status(500).json({ error: 'Failed to change password' });
   }
 });
 
